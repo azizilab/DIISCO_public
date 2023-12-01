@@ -28,14 +28,13 @@ def make_psd(mat):
     """
 
     # Add a small constant to the diagonal to make sure the matrix is positive definite
-    small_constant = 0.000000001
+    small_constant = 0.00001
 
     if mat.shape[0] == mat.shape[1]:
         if len(mat.shape) == 3:
             mat = (
                 mat
-                + torch.eye(mat.shape[-1]).repeat(mat.shape[0], 1, 1)
-                * small_constant
+                + torch.eye(mat.shape[-1]).repeat(mat.shape[0], 1, 1) * small_constant
             )
         else:
             mat = mat + torch.eye(mat.shape[-1]) * small_constant

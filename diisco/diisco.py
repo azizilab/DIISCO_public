@@ -18,7 +18,7 @@ import diisco.constants as constants
 import diisco.names as names
 import diisco.guides as guides
 from diisco.gaussian_process import GaussianProcessRegressor
-from diisco.math_ops import rbf_kernel
+from diisco.math_ops import rbf_kernel, is_psd
 from diisco.utils import shape_and_rate_from_range
 from diisco.prior_f_model import PriorFModel
 
@@ -41,7 +41,7 @@ class DIISCO:
         self,
         lambda_matrix: torch.Tensor,
         hypers_init_vals: dict = None,
-        use_bias: bool = True,
+        use_bias: bool = False,
         verbose: bool = False,
         verbose_freq: int = 100,
     ):
@@ -70,10 +70,9 @@ class DIISCO:
         self.train_timepoints = None
         self.train_proportions = None
 
+        hypers_init_vals = hypers_init_vals or {}
         self._check_user_hypers_init_vals(hypers_init_vals)
-        self.hypers_init_vals = self._get_full_hypers_init_vals(
-            hypers_init_vals
-        )
+        self.hypers_init_vals = self._get_full_hypers_init_vals(hypers_init_vals)
 
         self.prior_model = None
 
@@ -109,7 +108,8 @@ class DIISCO:
         :param n_iter: The number of iterations to run variational inference for.
         :param lr: The learning rate to use for variational inference.
         :param guide: The guide to use for variational inference. Currently only
-            "MultivariateNormal" and "MultivariateNormalFactorized" are supported.
+            "MultivariateNormal" and "MultivariateNormalFactorized" and "DiagonalNormal"
+            are supported.
         :param hypers_to_optimize: A list of hyperparameters to optimize to optimize
             using variational inference. This feature is very experimental and it
             probably best left unused.
@@ -149,9 +149,7 @@ class DIISCO:
         self._is_fit = True
         for i in range(n_iter):
             loss = self.svi.step(timepoints, proportions)
-            loss = (
-                loss / self.n_timepoints * self.n_cell_types * self.n_cell_types
-            )
+            loss = loss / self.n_timepoints * self.n_cell_types * self.n_cell_types
             self.losses.append(loss)
             if self.verbose and i % self.verbose_freq == 0:
                 print("[iteration %04d] loss: %.4f" % (i + 1, loss))
@@ -220,16 +218,14 @@ class DIISCO:
         f_covariance = self.prior_f_cov
         f_mean = self.prior_f_mean
 
+        assert is_psd(w_covariance), w_covariance
+
         with pyro.plate("cell_types_outer_W", n_cell_types, dim=-2):
             with pyro.plate("cell_types_inner_W", n_cell_types, dim=-1):
-                w_covariance = (
-                    w_covariance + torch.eye(n_timepoints) * sigma_w**2
-                )
+                w_covariance = w_covariance + torch.eye(n_timepoints) * sigma_w**2
                 W = pyro.sample(
                     names.W,
-                    dist.MultivariateNormal(
-                        torch.zeros(n_timepoints), w_covariance
-                    ),
+                    dist.MultivariateNormal(torch.zeros(n_timepoints), w_covariance),
                     infer=dict(
                         baseline={
                             "use_decaying_avg_baseline": True,
@@ -289,9 +285,7 @@ class DIISCO:
             subsample_size=subsample_size,
         ) as ind:
             with pyro.plate("data_plate_inner", n_cell_types, dim=-1):
-                W = W.permute(
-                    2, 0, 1
-                )  # reorder for batch matrix multiplication
+                W = W.permute(2, 0, 1)  # reorder for batch matrix multiplication
                 f = f.permute(1, 0)  # reorder for batch matrix multiplication
                 means = torch.bmm(W, f.unsqueeze(-1)).squeeze(-1)
                 assert means.shape == (n_timepoints, n_cell_types)
@@ -303,9 +297,7 @@ class DIISCO:
                 if subsample_size:
                     proportions = proportions[ind]
                     means = means[ind]
-                y = pyro.sample(
-                    names.Y, dist.Normal(means, sigma_y), obs=proportions
-                )
+                y = pyro.sample(names.Y, dist.Normal(means, sigma_y), obs=proportions)
 
     def score(
         self,
@@ -328,13 +320,9 @@ class DIISCO:
         samples = self.sample(timepoints, samples)
         proportions = proportions.unsqueeze(0)
 
-        return torch.mean(
-            torch.sum((samples - proportions) ** 2, dim=-1)
-        ).item()
+        return torch.mean(torch.sum((samples - proportions) ** 2, dim=-1)).item()
 
-    def sample_observed_proportions(
-        self, n_samples: int = 1000
-    ) -> torch.Tensor:
+    def sample_observed_proportions(self, n_samples: int = 1000) -> torch.Tensor:
         """
         Sample proportions to the model at the observed timepoints.
         To do this the model uses exclusively the parameters learned
@@ -342,9 +330,7 @@ class DIISCO:
         """
         y = []
         for _ in range(n_samples):
-            guide_trace = poutine.trace(self.guide).get_trace(
-                self.train_timepoints
-            )
+            guide_trace = poutine.trace(self.guide).get_trace(self.train_timepoints)
             trained_model = poutine.replay(self.model, trace=guide_trace)
             trained_model_trace = poutine.trace(trained_model).get_trace(
                 self.train_timepoints
@@ -414,19 +400,13 @@ class DIISCO:
 
         samples_so_far = 0
         while samples_so_far < n_samples:
-            guide_trace = poutine.trace(self.guide).get_trace(
-                self.train_timepoints
-            )
+            guide_trace = poutine.trace(self.guide).get_trace(self.train_timepoints)
             trained_model = poutine.replay(self._model, trace=guide_trace)
-            model_trace = poutine.trace(trained_model).get_trace(
-                self.train_timepoints
-            )
+            model_trace = poutine.trace(trained_model).get_trace(self.train_timepoints)
 
             W_sampled = model_trace.nodes[names.W]["value"]
             f_sampled = model_trace.nodes[names.F]["value"]
-            B_sampled = (
-                model_trace.nodes[names.B]["value"] if self.use_bias else None
-            )
+            B_sampled = model_trace.nodes[names.B]["value"] if self.use_bias else None
 
             w_length_scale = model_trace.nodes[names.LENGTHSCALE_W]["value"]
             w_variance = model_trace.nodes[names.VARIANCE_W]["value"]
@@ -467,9 +447,7 @@ class DIISCO:
                         variance=w_variance,
                     )
 
-                    regressor = GaussianProcessRegressor(
-                        gpr_w_kernel, sigma_y=sigma_w
-                    )
+                    regressor = GaussianProcessRegressor(gpr_w_kernel, sigma_y=sigma_w)
                     train_timepoints = self.train_timepoints.view(-1, 1)
                     train_w = W_sampled[i, j, :].view(-1, 1)
                     timepoints = timepoints.view(-1, 1)
@@ -505,9 +483,7 @@ class DIISCO:
                         variance=w_variance,
                     )
 
-                    regressor = GaussianProcessRegressor(
-                        gpr_b_kernel, sigma_y=sigma_w
-                    )
+                    regressor = GaussianProcessRegressor(gpr_b_kernel, sigma_y=sigma_w)
                     train_timepoints = self.train_timepoints.view(-1, 1)
                     train_b = B_sampled[i, :, :].view(-1, 1)
                     timepoints = timepoints.view(-1, 1)
@@ -551,9 +527,9 @@ class DIISCO:
                 f_cov
                 + delta_diag * 0.01
             )
-            f_predict = dist.MultivariateNormal(
-                f_mean.squeeze(-1), f_cov
-            ).sample((n_samples_per_latent,))
+            f_predict = dist.MultivariateNormal(f_mean.squeeze(-1), f_cov).sample(
+                (n_samples_per_latent,)
+            )
             assert f_predict.shape == (
                 n_samples_per_latent,
                 self.n_cell_types,
@@ -587,7 +563,9 @@ class DIISCO:
 
             y_predict_mean = torch.matmul(W_predict, f_predict).squeeze(-1)
             y_predict_mean = (
-                y_predict_mean + B_predict if self.use_bias else y_predict_mean
+                y_predict_mean + B_predict.squeeze(-1)
+                if self.use_bias
+                else y_predict_mean
             )
             y_predict_cov = torch.eye(self.n_cell_types) * sigma_y**2
             y_predict_cov = y_predict_cov.unsqueeze(0)
@@ -638,9 +616,7 @@ class DIISCO:
         )
         self.prior_model.fit(timepoints, proportions)
 
-        self.prior_f_mean, self.prior_f_cov = self.prior_model.predict(
-            timepoints
-        )
+        self.prior_f_mean, self.prior_f_cov = self.prior_model.predict(timepoints)
         self._prior_is_set = True
 
     def get_means(self, timepoints: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -649,9 +625,7 @@ class DIISCO:
 
         guide_trace = poutine.trace(self.guide).get_trace(self.train_timepoints)
         trained_model = poutine.replay(self._model, trace=guide_trace)
-        model_trace = poutine.trace(trained_model).get_trace(
-            self.train_timepoints
-        )
+        model_trace = poutine.trace(trained_model).get_trace(self.train_timepoints)
 
         W_sampled = self.guide.W_mean
         assert W_sampled.shape == (
@@ -668,9 +642,7 @@ class DIISCO:
 
         sigma_w = model_trace.nodes[names.SIGMA_W]["value"]
 
-        W_predict = torch.zeros(
-            (timepoints.shape[0], n_cell_types, n_cell_types)
-        )
+        W_predict = torch.zeros((timepoints.shape[0], n_cell_types, n_cell_types))
         for i in range(self.n_cell_types):
             for j in range(self.n_cell_types):
                 gpr_w_kernel = partial(
@@ -679,9 +651,7 @@ class DIISCO:
                     variance=w_variance,
                 )
 
-                regressor = GaussianProcessRegressor(
-                    gpr_w_kernel, sigma_y=sigma_w
-                )
+                regressor = GaussianProcessRegressor(gpr_w_kernel, sigma_y=sigma_w)
                 train_timepoints = self.train_timepoints.view(-1, 1)
                 train_w = W_sampled[:, i, j].view(-1, 1)
                 timepoints = timepoints.view(-1, 1)
@@ -704,9 +674,7 @@ class DIISCO:
                     variance=w_variance,
                 )
 
-                regressor = GaussianProcessRegressor(
-                    gpr_b_kernel, sigma_y=sigma_w
-                )
+                regressor = GaussianProcessRegressor(gpr_b_kernel, sigma_y=sigma_w)
                 train_timepoints = self.train_timepoints.view(-1, 1)
                 B_sampled = self.guide.B_mean
                 train_b = B_sampled[:, i].view(-1, 1)
@@ -765,13 +733,9 @@ class DIISCO:
         """
         W_samples = []
         for _ in range(n_samples):
-            guide_trace = poutine.trace(self.guide).get_trace(
-                self.train_timepoints
-            )
+            guide_trace = poutine.trace(self.guide).get_trace(self.train_timepoints)
             trained_model = poutine.replay(self._model, trace=guide_trace)
-            model_trace = poutine.trace(trained_model).get_trace(
-                self.train_timepoints
-            )
+            model_trace = poutine.trace(trained_model).get_trace(self.train_timepoints)
             W_sampled = model_trace.nodes[names.W]["value"]
             W_sampled = W_sampled * self.lambda_matrix.unsqueeze(-1)
             W_samples.append(W_sampled)
@@ -789,13 +753,9 @@ class DIISCO:
 
         f_samples = []
         for _ in range(n_samples):
-            guide_trace = poutine.trace(self.guide).get_trace(
-                self.train_timepoints
-            )
+            guide_trace = poutine.trace(self.guide).get_trace(self.train_timepoints)
             trained_model = poutine.replay(self._model, trace=guide_trace)
-            model_trace = poutine.trace(trained_model).get_trace(
-                self.train_timepoints
-            )
+            model_trace = poutine.trace(trained_model).get_trace(self.train_timepoints)
             f_sampled = model_trace.nodes[names.F]["value"]
             f_samples.append(f_sampled)
 
@@ -865,5 +825,5 @@ class DIISCO:
             )
         else:
             raise ValueError(
-                "The guide must be either 'MultivariateNormal' or 'MultivariateNormalFactorized'."
+                "The guide must be either 'MultivariateNormal' or 'MultivariateNormalFactorized'or 'DiagonalNormal'."
             )
