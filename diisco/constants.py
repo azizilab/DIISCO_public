@@ -8,9 +8,9 @@ import diisco.names as names
 # and the valid hyperparameter names.
 
 DEFAULT_HYPERS = {
-    names.LENGTHSCALE_W: 100,
+    names.LENGTHSCALE_W: 20,
     names.LENGTHSCALE_W_RANGE: 3,
-    names.LENGTHSCALE_F: 100,
+    names.LENGTHSCALE_F: 3,
     names.VARIANCE_W: 1.0,
     names.VARIANCE_F: 1.0,
     names.SIGMA_Y: 0.2,

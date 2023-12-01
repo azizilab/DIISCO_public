@@ -30,14 +30,10 @@ def register_guide(name):
 
     def register_guide_cls(cls):
         if name in GUIDE_REGISTRY:
-            raise ValueError(
-                "Cannot register duplicate guide ({})".format(name)
-            )
+            raise ValueError("Cannot register duplicate guide ({})".format(name))
         if not issubclass(cls, Guide):
             raise ValueError(
-                "Guide ({}: {}) must extend the Guide class".format(
-                    name, cls.__name__
-                )
+                "Guide ({}: {}) must extend the Guide class".format(name, cls.__name__)
             )
         GUIDE_REGISTRY[name] = cls
         return cls
@@ -90,9 +86,7 @@ class Guide:
             init_lengthscale_w,
             constraint=constraints.positive,
         )
-        w_lengthscale = pyro.sample(
-            names.LENGTHSCALE_W, dist.Delta(w_lengthscale)
-        )
+        w_lengthscale = pyro.sample(names.LENGTHSCALE_W, dist.Delta(w_lengthscale))
 
 
 @register_guide("multivariate_normal_factorized")
@@ -148,9 +142,7 @@ class MultivariateNormalFactorized(Guide):
             and proportions is not None
             and lambda_matrix is not None
         ):
-            init_W, init_B = self._init_params(
-                timepoints, proportions, lambda_matrix
-            )
+            init_W, init_B = self._init_params(timepoints, proportions, lambda_matrix)
             self.init_W = init_W
             self.init_B = init_B
 
@@ -240,30 +232,24 @@ class MultivariateNormalFactorized(Guide):
         mean_w = pyro.param(
             self.W_MEAN,
             self.init_W
-            + torch.randn(n_cell_types, n_cell_types, n_timepoints)
-            * EPSILON**2,
+            + torch.randn(n_cell_types, n_cell_types, n_timepoints) * EPSILON**2,
         )
         mean_b = pyro.param(
             self.B_MEAN,
-            self.init_B
-            + torch.randn(n_cell_types, 1, n_timepoints) * EPSILON**2,
+            self.init_B + torch.randn(n_cell_types, 1, n_timepoints) * EPSILON**2,
         )
         mean_f = pyro.param(self.F_MEAN, self.prior_f_mean).squeeze(-1)
 
         with pyro.plate("cell_types_outer_W", n_cell_types, dim=-2):
             with pyro.plate("cell_types_inner_W", n_cell_types, dim=-1):
-                pyro.sample(
-                    names.W, dist.MultivariateNormal(mean_w, covariances_w)
-                )
+                pyro.sample(names.W, dist.MultivariateNormal(mean_w, covariances_w))
         with pyro.plate("node_plate", n_cell_types, dim=-1):
             pyro.sample(names.F, dist.MultivariateNormal(mean_f, covariances_f))
 
         if self.use_bias:
             with pyro.plate("cell_types_outer_B", n_cell_types, dim=-2):
                 with pyro.plate("single_inner_B", 1, dim=-1):
-                    pyro.sample(
-                        names.B, dist.MultivariateNormal(mean_b, covariances_b)
-                    )
+                    pyro.sample(names.B, dist.MultivariateNormal(mean_b, covariances_b))
 
     def _init_params(self, timepoints, proportions, lambda_matrix):
         """
@@ -309,9 +295,9 @@ class MultivariateNormalFactorized(Guide):
             w = w.flatten() * lambda_matrix[cell_type, :].flatten()
             if self.use_bias:
                 b = torch.tensor(model.intercept_)
+                init_B[cell_type, :] = b
 
             init_W[cell_type, :, :] = w.unsqueeze(-1)
-            init_B[cell_type, :] = b
 
         init_B.unsqueeze_(1)
         assert init_W.shape == (n_cell_types, n_cell_types, n_timepoints)
@@ -391,9 +377,7 @@ class DiagonalNormal(Guide):
             and proportions is not None
             and lambda_matrix is not None
         ):
-            init_W, init_B = self._init_params(
-                timepoints, proportions, lambda_matrix
-            )
+            init_W, init_B = self._init_params(timepoints, proportions, lambda_matrix)
             self.init_W = init_W
             self.init_B = init_B
 
@@ -459,13 +443,11 @@ class DiagonalNormal(Guide):
         mean_w = pyro.param(
             self.W_MEAN,
             self.init_W
-            + torch.randn(n_cell_types, n_cell_types, n_timepoints)
-            * EPSILON**2,
+            + torch.randn(n_cell_types, n_cell_types, n_timepoints) * EPSILON**2,
         )
         mean_b = pyro.param(
             self.B_MEAN,
-            self.init_B
-            + torch.randn(n_cell_types, 1, n_timepoints) * EPSILON**2,
+            self.init_B + torch.randn(n_cell_types, 1, n_timepoints) * EPSILON**2,
         )
         mean_f = pyro.param(self.F_MEAN, self.prior_f_mean).squeeze(-1)
 
@@ -539,7 +521,6 @@ class DiagonalNormal(Guide):
                 init_B[cell_type, :] = b
 
             init_W[cell_type, :, :] = w.unsqueeze(-1)
-
 
         init_B.unsqueeze_(1)
         assert init_W.shape == (n_cell_types, n_cell_types, n_timepoints)

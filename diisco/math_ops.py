@@ -5,7 +5,10 @@ import diisco.utils as utils
 
 def is_psd(mat):
     is_symmetric = bool((mat == mat.T).all())
-    is_positive_definite = bool(torch.all(torch.symeig(mat)[0] > 0))
+
+    eigenvalues = torch.linalg.eigvalsh(mat)
+    is_positive_definite = bool((eigenvalues > 0).all())
+
     return is_symmetric and is_positive_definite
 
 
