@@ -63,6 +63,7 @@ class DIISCO:
         self.svi = None
         self.losses = []
         self.device = None  # Currently not used
+        self.guide_name = None
 
         self.lambda_matrix = lambda_matrix
         self.use_bias = use_bias
@@ -93,7 +94,7 @@ class DIISCO:
         proportions: torch.Tensor,
         n_iter: int = 1000,
         lr: float = 0.1,
-        guide: str = "MultivariateNormal",
+        guide: str = "MultivariateNormalFactorized",
         subsample_size: int = None,
         hypers_to_optim: dict = None,
     ):
@@ -115,6 +116,7 @@ class DIISCO:
             probably best left unused.
         """
         self.subsample_size = subsample_size
+        self.guide_name = guide
 
         self.train_timepoints = timepoints
         self.train_proportions = proportions
@@ -620,6 +622,17 @@ class DIISCO:
         self._prior_is_set = True
 
     def get_means(self, timepoints: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """
+        Returns the means of the parameters of the model faster than
+        sampling from the posterior. This function is currently only
+        supported while using a MultivariateNormalFactorized guide.
+        """
+        if self.guide_name != "MultivariateNormalFactorized":
+            raise ValueError(
+                "The get_means function is only supported when using the "
+                "MultivariateNormalFactorized guide."
+            )
+
         n_train_timepoints = self.train_timepoints.shape[0]
         n_cell_types = self.n_cell_types
 
@@ -719,7 +732,7 @@ class DIISCO:
             y_predict_mean = y_predict_mean + B_predict.squeeze(-1)
         means = {
             names.W: W_predict.detach(),
-            names.F: f_predict.squeeze(-1).detach(),
+            names.F: f_predict.detach(),
             names.Y: y_predict_mean.detach(),
             names.B: B_predict.detach() if self.use_bias else None,
         }
