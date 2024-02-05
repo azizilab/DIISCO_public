@@ -31,4 +31,6 @@ def rbf_kernel(
     dists = torch.cdist(x1_scaled, x2_scaled, p=2)
     covariance = variance * torch.exp(-0.5 * dists**2)
     covariance = utils.make_psd(covariance)
+    if x1.shape[0] == x2.shape[0]:
+        covariance = utils.make_symmetric(covariance)
     return covariance

@@ -84,6 +84,10 @@ class DIISCO:
             None  # The covariance to use for the variational distribution
         )
 
+        # The following are used for faster computations in model
+        self._cov_w_factor = None
+        self._cov_f_factor = None
+
         self.verbose = verbose
         self.verbose_freq = verbose_freq
         self.sub_size = None
@@ -97,6 +101,7 @@ class DIISCO:
         guide: str = "MultivariateNormalFactorized",
         subsample_size: int = None,
         hypers_to_optim: dict = None,
+        patience = 5000,
     ):
         """
         This function fits the DIISCO model fully to the data. It is
@@ -108,6 +113,8 @@ class DIISCO:
              contains the cell proportions at each timepoint.
         :param n_iter: The number of iterations to run variational inference for.
         :param lr: The learning rate to use for variational inference.
+        :param patience: The number of iterations to wait before stopping the
+            training if the loss does not improve.
         :param guide: The guide to use for variational inference. Currently only
             "MultivariateNormal" and "MultivariateNormalFactorized" and "DiagonalNormal"
             are supported.
@@ -149,12 +156,33 @@ class DIISCO:
 
         self.losses = []
         self._is_fit = True
+        """
         for i in range(n_iter):
             loss = self.svi.step(timepoints, proportions)
             loss = loss / self.n_timepoints * self.n_cell_types * self.n_cell_types
             self.losses.append(loss)
             if self.verbose and i % self.verbose_freq == 0:
                 print("[iteration %04d] loss: %.4f" % (i + 1, loss))
+        """
+
+        no_improve = 0
+        min_loss = float("inf")
+        pbar = tqdm(range(n_iter), disable=not self.verbose)
+
+        for i in pbar:
+            loss = self.svi.step(timepoints, proportions)
+            loss = loss / self.n_timepoints * self.n_cell_types * self.n_cell_types
+            self.losses.append(loss)
+            if loss < min_loss:
+                min_loss = loss
+                no_improve = 0
+            else:
+                no_improve += 1
+            if self.verbose and i % self.verbose_freq == 0:
+                pbar.set_description(f"loss: {loss:.4f}")
+            if no_improve >= patience:
+                print("Early stopping at iteration %04d, loss: %.4f" % (i + 1, loss))
+                break
 
     def _get_model_hypers(self) -> dict:
         """
@@ -211,20 +239,25 @@ class DIISCO:
         sigma_y = hypers[names.SIGMA_Y]
         lengthscale_w = hypers[names.LENGTHSCALE_W]
         variance_w = hypers[names.VARIANCE_W]
+
+        #if self._cov_w_factor is None:
         w_covariance = rbf_kernel(
-            timepoints,
-            timepoints,
-            length_scale=lengthscale_w,
-            variance=variance_w,
-        )
+                timepoints,
+                timepoints,
+                length_scale=lengthscale_w,
+                variance=variance_w,
+            )
+        w_covariance = w_covariance + torch.eye(n_timepoints) * sigma_w**2
+        #self._cov_w_factor = torch.cholesky(w_covariance).detach()
+
+        #if self._cov_f_factor is None:
         f_covariance = self.prior_f_cov
+        #self._cov_f_factor = torch.cholesky(f_covariance).detach()
+
         f_mean = self.prior_f_mean
-
-        assert is_psd(w_covariance), w_covariance
-
         with pyro.plate("cell_types_outer_W", n_cell_types, dim=-2):
             with pyro.plate("cell_types_inner_W", n_cell_types, dim=-1):
-                w_covariance = w_covariance + torch.eye(n_timepoints) * sigma_w**2
+
                 W = pyro.sample(
                     names.W,
                     dist.MultivariateNormal(torch.zeros(n_timepoints), w_covariance),
