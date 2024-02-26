@@ -1,5 +1,6 @@
 """
 This scipt contains the code to run the r2 vs prop experiment presented in the paper.
+Results get saved to a directory called proportion_dir.
 """
 import time
 import os
@@ -156,7 +157,7 @@ def run_and_compute_r2(W_full, W_prior, timepoints, clusters, hyperparams, name,
 
 def run_task(args):
     run, prop, W, W_prior, timepoints, clusters, hyperparams = args
-    res = run_and_compute_r2(W, W_prior, timepoints, clusters, hyperparams, str(run), "prop_full", prop)
+    res = run_and_compute_r2(W, W_prior, timepoints, clusters, hyperparams, str(run), "proportion_dir", prop)
     return res['r2']
 
 
@@ -221,12 +222,9 @@ def main():
 
     # Create a pool of worker processes
 
-    with Pool(processes=16) as pool:
+    with Pool(processes=1) as pool:
         # Map run_task over the tasks, distributing them across the process pool
         results = pool.map(run_task, tasks)
 
-        # Print the results
-        for r2 in results:
-            print(r2)
 
 main()
