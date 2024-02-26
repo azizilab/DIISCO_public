@@ -150,20 +150,12 @@ class DIISCO:
         self.svi = pyro.infer.SVI(
             model=self.model,
             guide=self.guide,
-            optim=pyro.optim.ClippedAdam({"lr": lr, "lrd": 0.9999}),
+            optim=pyro.optim.ClippedAdam({"lr": lr, "lrd": 0.99999}),
             loss=pyro.infer.Trace_ELBO(),
         )
 
         self.losses = []
         self._is_fit = True
-        """
-        for i in range(n_iter):
-            loss = self.svi.step(timepoints, proportions)
-            loss = loss / self.n_timepoints * self.n_cell_types * self.n_cell_types
-            self.losses.append(loss)
-            if self.verbose and i % self.verbose_freq == 0:
-                print("[iteration %04d] loss: %.4f" % (i + 1, loss))
-        """
 
         no_improve = 0
         min_loss = float("inf")
@@ -248,11 +240,8 @@ class DIISCO:
                 variance=variance_w,
             )
         w_covariance = w_covariance + torch.eye(n_timepoints) * sigma_w**2
-        #self._cov_w_factor = torch.cholesky(w_covariance).detach()
-
-        #if self._cov_f_factor is None:
         f_covariance = self.prior_f_cov
-        #self._cov_f_factor = torch.cholesky(f_covariance).detach()
+
 
         f_mean = self.prior_f_mean
         with pyro.plate("cell_types_outer_W", n_cell_types, dim=-2):
