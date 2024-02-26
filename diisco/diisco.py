@@ -150,7 +150,7 @@ class DIISCO:
         self.svi = pyro.infer.SVI(
             model=self.model,
             guide=self.guide,
-            optim=pyro.optim.Adam({"lr": lr}),
+            optim=pyro.optim.ClippedAdam({"lr": lr, "lrd": 0.9999}),
             loss=pyro.infer.Trace_ELBO(),
         )
 
@@ -787,11 +787,11 @@ class DIISCO:
             W_samples.append(W_sampled)
 
         W_mean = torch.stack(W_samples).mean(0)
-        W_mean = W_mean.permute(2, 0, 1)
+        #W_mean = W_mean.permute(0, 1)
         assert W_mean.shape == (
+            self.n_cell_types,
+            self.n_cell_types,
             self.n_timepoints,
-            self.n_cell_types,
-            self.n_cell_types,
         )
         return W_mean
 

@@ -1,7 +1,11 @@
-import multiprocessing
+"""
+This contains the scripts needed to run the scalability experiments of the
+paper. The results are saved in a directoy.
+"""
 import time
 import os
 import json
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch as t
@@ -44,7 +48,6 @@ def generate_data(n_time_points: int, n_clusters: int, base_clusters: int, start
         W_full[i, i] = 1
         W_prior[i, i] = 1
 
-
     # Now we sample the dependent clusters
     for dep_num in range(dependent_clusters):
         # choose a random number of base clusters to use
@@ -66,10 +69,6 @@ def generate_data(n_time_points: int, n_clusters: int, base_clusters: int, start
     return time_points, clusters, W_full, W_prior
 
 
-
-
-
-
 def run_model(n_time_points: int, save_dir: str, n_clusters: int, name):
     """
     Runs the model till convergence and saves the results
@@ -78,12 +77,11 @@ def run_model(n_time_points: int, save_dir: str, n_clusters: int, name):
 
     """
     name = "{}_{}_{}_{}.json".format(name, n_time_points, n_clusters, "DiagonalNormal")
+    print("Running", name)
     if os.path.exists(os.path.join(save_dir, name)):
         print("Skipping", name, "as it already exists")
         return
-
-
-    base_clusters =  int(n_clusters / 2)
+    base_clusters =  int((50/100) * n_clusters)
     start = 0
     end = 10 * (n_time_points / 100)
 
@@ -98,44 +96,60 @@ def run_model(n_time_points: int, save_dir: str, n_clusters: int, name):
 
 
     hyperparams = {
-        names.LENGTHSCALE_F: 0.5,
-        names.LENGTHSCALE_W: 0.5,
-        names.SIGMA_F: 0.5,
+        names.LENGTHSCALE_F: 1,
+        names.LENGTHSCALE_W: 10,
+        names.SIGMA_F: 0.1,
         names.VARIANCE_F: 1,
         names.SIGMA_W: 0.1,
         names.VARIANCE_W: 1,
-        names.SIGMA_Y: 0.5,
+        names.SIGMA_Y: 0.1,
     }
 
     start_time = time.time()
     model = DIISCO(lambda_matrix=W_prior, hypers_init_vals=hyperparams, verbose=True)
     model.fit(timepoints,
             proportions,
-            n_iter=100000,
+            n_iter=50_000,
             patience=500,
-            lr=0.005,
+            lr=0.007,
             hypers_to_optim=[],
             guide="DiagonalNormal")
     end_time = time.time()
     time_taken = end_time - start_time
 
-    # Save the results to a file
+    W_mean = model.sample(n_samples=10, n_samples_per_latent=100, timepoints=timepoints)[names.W].mean(dim=0).permute(1, 2, 0)
+
+    diff = (W_full - W_mean.detach().numpy())**2
+    diff = diff.mean(axis=-1)
+
+    base = W_full**2
+    base = base.mean(axis=-1) + 1e-10
+
+    W_prior = W_prior.detach().numpy()
+    r2 = (1 - diff/base) * W_prior
+
+    # zero out nans
+    r2[np.isnan(r2)] = 0
+    r2 = r2.sum() / W_prior.sum()
+
+
     results = {
         "time_taken": time_taken,
         "hyperparams": hyperparams,
-        "n_time_points": n_time_points,
-        "n_clusters": n_clusters,
+        "r2" : r2.item(),
+        "mse" : diff.sum().item()/W_full.sum().item(),
     }
+
 
     # Save the results dir
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
     # use json to save the results
-
-
     with open(os.path.join(save_dir, name), "w") as f:
         json.dump(results, f)
+
+    print("Done", name)
 
 
 #################################################
@@ -144,20 +158,14 @@ def run_model(n_time_points: int, save_dir: str, n_clusters: int, name):
 
 if __name__ == "__main__":
     # Common directory to save all outputs
-    save_dir = "results"
+    save_dir = "results_multiple"
 
     # Define different configurations for each process to run
-    n_time_points = [50, 100, 500, 800]
-    n_clusters = [5, 10, 50, 100, 200, 500]
-    #n_clusters = [5, 8]
-    #n_time_points = [10, 20, 25]
+    n_time_points = [2, 5, 10, 20]
+    n_clusters = [2, 5, 10, 20, 50, 100]
+
     configurations = []
-    for n in n_time_points:
-        for c in n_clusters:
-            configurations.append((n, save_dir, c, f"run_{n}_{c}"))
-
-
-    # Create a pool of worker processes
-    with multiprocessing.Pool(processes=4) as pool:
-        # Use starmap to pass each tuple from configurations as arguments to run_model
-        pool.starmap(run_model, configurations)
+    for run in range(10):
+        for n in n_time_points:
+            for c in n_clusters:
+                configurations.append((n, f"{run}_save_dir_time", c, f"run_{n}_{c}"))
