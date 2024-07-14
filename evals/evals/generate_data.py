@@ -8,54 +8,21 @@ import numpy as np
 
 import numpy as np
 from jaxtyping import Float
+from dataclasses import dataclass
 
-def sample_from_gp(x: Float[np.ndarray, "n_examples, 1"], lengthscale: float, noise: float) -> Float[np.ndarray, "n_examples, 1"]:
-    """
-    Sample from a Gaussian Process with a standard Gaussian (RBF) kernel.
-
-    Parameters:
-    - x : np.ndarray : Input array of shape (n_examples, 1)
-    - lengthscale : float : Lengthscale parameter for the RBF kernel
-    - noise : float : Noise term for the kernel
-
-    Returns:
-    - np.ndarray : Sampled values from the GP of shape (n_examples, 1)
-    """
-
-    # Ensure x is a 2D array
-    if x.ndim == 1:
-        x = x[:, np.newaxis]
-
-    # Number of examples
-    n_examples = x.shape[0]
-
-    def rbf_kernel(a: Float[np.ndarray, "n, d"], b: Float[np.ndarray, "m, d"], lengthscale: float) -> Float[np.ndarray, "n, m"]:
-        """
-        Radial Basis Function (RBF) kernel.
-
-        Parameters:
-        - a : np.ndarray : First input array of shape (n, d)
-        - b : np.ndarray : Second input array of shape (m, d)
-        - lengthscale : float : Lengthscale parameter for the RBF kernel
-
-        Returns:
-        - np.ndarray : Covariance matrix of shape (n, m)
-        """
-        sqdist = np.sum(a**2, 1).reshape(-1, 1) + np.sum(b**2, 1) - 2 * np.dot(a, b.T)
-        return np.exp(-0.5 * sqdist / lengthscale**2)
-
-    # Compute the covariance matrix
-    K = rbf_kernel(x, x, lengthscale) + noise**2 * np.eye(n_examples)
-
-    # Sample from the multivariate normal distribution
-    L = np.linalg.cholesky(K + 1e-6 * np.eye(n_examples))
-    sample = L @ np.random.normal(size=(n_examples, 1))
-
-    return sample
+@dataclass
+class SampledData:
+    # The latent weights matrix
+    weights_matrix: Float[np.ndarray, "n_timepoints total_cells total_cells"]
+    # Whether an edge is active or not should be the same across all timepoints
+    is_active_matrix: Float[np.ndarray, "n_timepoints total_cells total_cells"]
+    # The actual matrix with observed values
+    observed_matrix: Float[np.ndarray, "n_timepoints total_cells"]
+    # The timepoints at which the data was sampled. This should be uniform
+    timepoints: Float[np.ndarray, "n_timepoints"]
 
 
-
-def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_dependent_per_block : int = 10, n_timepoints : int = 100, noise : float = 0.1, length_scale : float = 1, seed : int = 0, p_active : float = 0.1):
+def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_dependent_per_block : int = 10, n_timepoints : int = 100, noise : float = 0.1, length_scale : float = 1, seed : int = 0, p_active : float = 0.1) -> SampledData:
     """
     Generates data for DIISCO
 
@@ -81,8 +48,8 @@ def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_depe
     length_scale : float
         The length scale of the gaussian process
 
-    Returns
-    -------
+    Returns SampledData
+    ------------------------
     weights_matrix : np.ndarray
         The weights matrix of shape (n_timepoints, total_cells, total_cells)
     is_active_matrix : np.ndarray
@@ -109,11 +76,14 @@ def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_depe
     # Fill in the weights matrix
     for i in range(total_cells):
         for j in range(total_cells):
-            weights_matrix[:, i, j] = sample_from_gp(timepoints, weights_length_scale, noise).flatten()
+            if i == j:
+                weights_matrix[:, i, j] = 1
+            else:
+                weights_matrix[:, i, j] = _sample_from_gp(timepoints, weights_length_scale, noise).flatten()
 
     # Lets pretend that they all independent variables at the start
     for cell in range(total_cells):
-        observed_matrix[:, cell] = sample_from_gp(timepoints, length_scale, noise).flatten()
+        observed_matrix[:, cell] = _sample_from_gp(timepoints, length_scale, noise).flatten()
 
     # Now we repace the dependent variables with the independent variables
     for block in range(n_blocks):
@@ -127,11 +97,66 @@ def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_depe
                 observed_matrix[timepoint, cell] = weights_matrix[timepoint, cell, independent_block] @ actual_observed_matrix + np.random.normal(0, noise)
                 is_active_matrix[timepoint, cell, independent_block] = active_independent_cells_mask
 
-        is_active_matrix[:, dependent_block, dependent_block] = 1
+
+    # Set diagonals to 1 in is_active and weights matrix
+    for i in range(total_cells):
+        for j in range(total_cells):
+            if i == j:
+                is_active_matrix[:, i, j] = 1
+
+    # Zero out the values of W that are not active
+    weights_matrix = weights_matrix * is_active_matrix
 
     assert weights_matrix.shape == (n_timepoints, total_cells, total_cells)
     assert is_active_matrix.shape == (n_timepoints, total_cells, total_cells)
     assert observed_matrix.shape == (n_timepoints, total_cells)
     assert timepoints.shape == (n_timepoints,)
 
-    return weights_matrix, is_active_matrix, observed_matrix, timepoints
+    return SampledData(weights_matrix, is_active_matrix, observed_matrix, timepoints)
+
+
+
+
+def _sample_from_gp(x: Float[np.ndarray, "n_examples 1"], lengthscale: float, noise: float) -> Float[np.ndarray, "n_examples 1"]:
+    """
+    Sample from a Gaussian Process with a standard Gaussian (RBF) kernel.
+
+    Parameters:
+    - x : np.ndarray : Input array of shape (n_examples, 1)
+    - lengthscale : float : Lengthscale parameter for the RBF kernel
+    - noise : float : Noise term for the kernel
+
+    Returns:
+    - np.ndarray : Sampled values from the GP of shape (n_examples, 1)
+    """
+
+    # Ensure x is a 2D array
+    if x.ndim == 1:
+        x = x[:, np.newaxis]
+
+    # Number of examples
+    n_examples = x.shape[0]
+
+    def rbf_kernel(a: Float[np.ndarray, "n d"], b: Float[np.ndarray, "m d"], lengthscale: float) -> Float[np.ndarray, "n m"]:
+        """
+        Radial Basis Function (RBF) kernel.
+
+        Parameters:
+        - a : np.ndarray : First input array of shape (n, d)
+        - b : np.ndarray : Second input array of shape (m, d)
+        - lengthscale : float : Lengthscale parameter for the RBF kernel
+
+        Returns:
+        - np.ndarray : Covariance matrix of shape (n, m)
+        """
+        sqdist = np.sum(a**2, 1).reshape(-1, 1) + np.sum(b**2, 1) - 2 * np.dot(a, b.T)
+        return np.exp(-0.5 * sqdist / lengthscale**2)
+
+    # Compute the covariance matrix
+    K = rbf_kernel(x, x, lengthscale) + noise**2 * np.eye(n_examples)
+
+    # Sample from the multivariate normal distribution
+    L = np.linalg.cholesky(K + 1e-6 * np.eye(n_examples))
+    sample = L @ np.random.normal(size=(n_examples, 1))
+
+    return sample
