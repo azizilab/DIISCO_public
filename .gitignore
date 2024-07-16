@@ -1,0 +1,6 @@
+# add python stuff
+*.pyc
+*__pycache__/
+*.pyo
+*.pyd
+*egg-info/
