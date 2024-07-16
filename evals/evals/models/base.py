@@ -29,7 +29,7 @@ class Model(ABC):
         pass
 
     @abstractmethod
-    def predict_interaction(
+    def predict_interactions(
         self,
         t: Float[ndarray, " n_timepoints"],
         Y: Float[ndarray, "n_timepoints n_cells"] = None,
@@ -54,7 +54,7 @@ class Model(ABC):
         """
         pass
 
-    def predict_obs_interaction(
+    def predict_obs_interactions(
         self,
     ) -> Float[ndarray, "n_timepoints n_cells n_cells"]:
         """
@@ -67,22 +67,9 @@ class Model(ABC):
         """
         pass
 
-    @property
-    @abstractmethod
-    def can_predict_unobserved(self) -> bool:
-        """
-        Returns
-        -------
-        can_predict_unobserved : bool
-            Returns whether the model can predict unobserved timepoints.
-            If true the model can use predict_w_mean to predict timepoints.
-            Otherwise the model can only predict timepoints which were observed
-            and hence only predict_obs_w_mean can be used.
-        """
-        pass
-
 
 AVAILABLE_MODELS = {}
+
 
 # create a decorator for registering models
 def register_model(cls):

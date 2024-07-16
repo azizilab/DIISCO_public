@@ -10,21 +10,7 @@ from typing import Optional
 from sklearn.linear_model import LinearRegression
 import shap
 import numpy as np
-
-
-def _check_fit_inputs(t: Float[ndarray, "n_timepoints"], Y: Float[ndarray, "n_timepoints n_cells"], is_active: Int[ndarray, "n_cells n_cells"]) -> None:
-    if t.ndim != 1:
-        raise ValueError(f"t should be a 1D array, but got shape {t.shape}")
-    if Y.ndim != 2:
-        raise ValueError(f"Y should be a 2D array, but got shape {Y.shape}")
-    if is_active.ndim != 2:
-        raise ValueError(f"is_active should be a 2D array, but got shape {is_active.shape}")
-    if Y.shape[0] != t.shape[0]:
-        raise ValueError(f"Y.shape[0] should be equal to t.shape[0], but got {Y.shape[0]} and {t.shape[0]}")
-    if Y.shape[1] != is_active.shape[0]:
-        raise ValueError(f"Y.shape[1] should be equal to is_active.shape[0], but got {Y.shape[1]} and {is_active.shape[0]}")
-    if is_active.shape[0] != is_active.shape[1]:
-        raise ValueError(f"is_active should be a square matrix, but got shape {is_active.shape}")
+from evals.models.utils import check_fit_inputs
 
 
 @register_model
@@ -39,14 +25,14 @@ class LinearModel(Model):
     """
 
     def __init__(self):
-        self._models : list[LinearRegression] = None # len(models) == n_cells
-        self._is_active : Int[ndarray, "n_cells n_cells"] = None
-        self._n_cells : int = None
-        self._n_timepoints : int = None
-        self._is_fitted : bool = False
+        self._models: list[LinearRegression] = None  # len(models) == n_cells
+        self._is_active: Int[ndarray, "n_cells n_cells"] = None
+        self._n_cells: int = None
+        self._n_timepoints: int = None
+        self._is_fitted: bool = False
 
-        self._t_train : Float[ndarray, " n_timepoints"] = None
-        self._Y_train : Float[ndarray, "n_timepoints n_cells"] = None
+        self._t_train: Float[ndarray, " n_timepoints"] = None
+        self._Y_train: Float[ndarray, "n_timepoints n_cells"] = None
 
     def fit(
         self,
@@ -64,7 +50,7 @@ class LinearModel(Model):
         is_active:
             A matrix containing 1 if the edge is active, 0 otherwise
         """
-        _check_fit_inputs(t, Y, is_active)
+        check_fit_inputs(t, Y, is_active)
 
         self._n_timepoints = t.shape[0]
         self._n_cells = Y.shape[1]
@@ -107,12 +93,16 @@ class LinearModel(Model):
         if not self._is_fitted:
             raise ValueError("The model has not been fitted yet.")
         if Y is None:
-            raise ValueError(f"Y should be provided to predict_w_mean for the {self.__class__.__name__} model.")
+            raise ValueError(
+                f"Y should be provided to predict_w_mean for the {self.__class__.__name__} model."
+            )
 
         shap_values = np.zeros((self._n_timepoints, self._n_cells, self._n_cells))
 
         for cell in range(self._n_cells):
-            active_cell_idx = [i for i in range(self._n_cells) if self._is_active[cell, i] == 1]
+            active_cell_idx = [
+                i for i in range(self._n_cells) if self._is_active[cell, i] == 1
+            ]
             lm_X = Y[:, active_cell_idx]
             X100 = shap.utils.sample(lm_X, 100)
             explainer = shap.Explainer(self._models[cell].predict, X100)
@@ -121,7 +111,6 @@ class LinearModel(Model):
             shap_values[:, cell, active_cell_idx] = cell_shap_values
 
         return shap_values
-
 
     def predict_obs_interaction(
         self,
@@ -138,18 +127,3 @@ class LinearModel(Model):
             raise ValueError("The model has not been fitted yet.")
 
         return self.predict_interaction(self._t_train, self._Y_train)
-
-
-    @property
-    def can_predict_unobserved(self) -> bool:
-        """
-        Returns
-        -------
-        can_predict_unobserved : bool
-            Returns whether the model can predict unobserved timepoints.
-            If true the model can use predict_w_mean to predict timepoints.
-            Otherwise the model can only predict timepoints which were observed
-            and hence only predict_obs_w_mean can be used.
-        """
-        return True
-
