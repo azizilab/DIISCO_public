@@ -13,7 +13,7 @@ class Model(ABC):
     def fit(
         self,
         t: Float[ndarray, " n_timepoints"],
-        Y: Float[ndarray, "n_timepoints n_cells"],
+        y: Float[ndarray, "n_timepoints n_cells"],
         is_active: Bool[ndarray, "n_cells n_cells"],
     ) -> None:
         """
@@ -32,7 +32,7 @@ class Model(ABC):
     def predict_interactions(
         self,
         t: Float[ndarray, " n_timepoints"],
-        Y: Float[ndarray, "n_timepoints n_cells"] = None,
+        y: Float[ndarray, "n_timepoints n_cells"] = None,
     ) -> Float[ndarray, "n_timepoints n_cells n_cells"]:
         """
         Parameters
@@ -40,7 +40,7 @@ class Model(ABC):
         t : np.ndarray
             The time points at which to predict. These don't have to be the
             same as the time points used to fit the model.
-        Y : np.ndarray
+        y : np.ndarray
             The observed values of the cells at time t. Not every model needs to use this
             and ideally no model should use this so that the model can be used to predict
             points where there is no data.
@@ -64,6 +64,18 @@ class Model(ABC):
             Returns the interaction matrix quantifying the strength of the interaction
             between cell j and cell i. but only for the timepoints which were
             observed during the fit phase.
+        """
+        pass
+
+    def predict_y_train(
+        self,
+    ) -> Float[ndarray, "n_timepoints n_cells"]:
+        """
+        Predicts the observed values of the cells at the timepoints used during the
+        fitting phase.
+
+        This method is useful for debugging, testing, and for evaluating the quality
+        of the learned model on training data.
         """
         pass
 
