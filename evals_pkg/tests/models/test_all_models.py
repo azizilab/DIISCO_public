@@ -9,7 +9,7 @@ from sklearn.metrics import r2_score
 @pytest.mark.parametrize(
     "model_class, linear_data, model_config",
     [
-        # (LinearModel, True),
+        (LinearModel, True, {}),
         (RollingLinearModel, True, {"min_points_per_regression": 10}),
         (RollingLinearModel, False, {"min_points_per_regression": 10}),
     ],

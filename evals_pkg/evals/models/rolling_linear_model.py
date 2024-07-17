@@ -317,7 +317,7 @@ def _get_rolling_linear_model(
         min_points_per_regression=min_points_per_regression,
     )
 
-    model = Ridge(alpha=0.1)
+    model = LinearRegression()
     model.fit(X_used, y_used)
     return model
 
