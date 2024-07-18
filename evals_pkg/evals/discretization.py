@@ -7,9 +7,11 @@ from jaxtyping import Int, Float
 from numpy import ndarray
 import numpy as np
 import einops
+
 # import gmm from sklearn
 from sklearn.mixture import GaussianMixture
 from sklearn.covariance import EllipticEnvelope
+
 
 class Discretizer(ABC):
     """
@@ -30,7 +32,12 @@ class Discretizer(ABC):
         the strength of the interaction is measured by w_i * y_i / y_j
     """
 
-    def __init__(self, std_deviations: float = 1, count_zeros: bool = True, standardize: bool = True):
+    def __init__(
+        self,
+        std_deviations: float = 1,
+        count_zeros: bool = True,
+        standardize: bool = True,
+    ):
         self.std_deviations = std_deviations
         self.count_zeros = count_zeros
         self.standardize = standardize
@@ -56,6 +63,9 @@ class Discretizer(ABC):
         Recieves, timepoints, observed values of the cells, and the predicted interactions
         and returns a boolean matrix (0 or 1) indicating whether the interaction is active
         at that timepoint or not.
+
+        Discretizes the interactions by computing the std and choosing the interactions
+        that are above a certain number of std deviations from the mean.
         """
         # Just for safety
         transformed_interactions = np.abs(transformed_interactions)
@@ -68,8 +78,6 @@ class Discretizer(ABC):
             cell_std = values.std()
 
         return (transformed_interactions > self.std_deviations * cell_std).astype(int)
-
-
 
     @abstractmethod
     def transform_interactions(
@@ -103,11 +111,12 @@ class Discretizer(ABC):
         assert interactions.shape == (n_timepoints, n_cells, n_cells)
 
 
-class MultiplicationDiscretizer(Discretizer):
+class AbsoluteValueDiscretizer(Discretizer):
     """
-    Discretizes the interaction by assuming that w_i * y_i
-    provides the strength of the interaction between cell i and cell j
-    when predicting cell j.
+    Discretizes the interaction by taking the absolute values
+    of the interactions. This is only a good idea if the interactions
+    the data is centered and scaled. Otherwise, the magnitudes of
+    the interactions will be uninformative.
 
     Parameters
     ----------
@@ -120,7 +129,12 @@ class MultiplicationDiscretizer(Discretizer):
         the strength of the interaction is measured by w_i * y_i / y_j
     """
 
-    def __init__(self, std_deviations: float = 1, count_zeros: bool = True, standardize: bool = True):
+    def __init__(
+        self,
+        std_deviations: float = 1,
+        count_zeros: bool = True,
+        standardize: bool = True,
+    ):
         super().__init__(std_deviations, count_zeros, standardize)
 
     def transform_interactions(

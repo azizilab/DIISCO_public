@@ -1,5 +1,5 @@
 from evals.models import Model, LinearModel, RollingLinearModel
-from evals.discretization import MultiplicationDiscretizer
+from evals.discretization import AbsoluteValueDiscretizer
 
 import pytest
 from jaxtyping import Float, Bool
@@ -30,7 +30,7 @@ def test_sanity_models(model_class: Model, linear_data: bool, model_config: dict
 
     obs_interactions = model.predict_obs_interactions()
 
-    discretizer = MultiplicationDiscretizer(std_deviations, count_zeros)
+    discretizer = AbsoluteValueDiscretizer(std_deviations, count_zeros)
     discretization = discretizer(t, y, obs_interactions)
     assert discretization.shape == (n_timepoints, n_cells, n_cells)
 
