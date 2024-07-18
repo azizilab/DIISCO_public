@@ -21,9 +21,16 @@ class LinearModel(Model):
     This model learns to predict y(t)_i = W(t)_i @ y(t)_{-i}. Additionally
     a is_active matrix can be used to only use certain cells to predict the
     value of cell i.
+
+    Parameters
+    ----------
+    use_bias : bool
+        Whether to use a bias term in the linear model.
     """
 
-    def __init__(self):
+    def __init__(self, use_bias: bool = False):
+        self._use_bias = use_bias
+
         self._models: list[LinearRegression] = []  # len(models) == n_cells
         self._is_active: Int[ndarray, "n_cells n_cells"] = None
         self._n_cells: int = None
@@ -59,7 +66,7 @@ class LinearModel(Model):
         self._y_train = y
 
         for cell in range(self._n_cells):
-            model = LinearRegression()
+            model = LinearRegression(fit_intercept=self._use_bias)
             lm_X = y[:, [i for i in range(self._n_cells) if is_active[cell, i] == 1]]
             lm_y = y[:, cell]
             model.fit(lm_X, lm_y)
