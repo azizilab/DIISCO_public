@@ -54,6 +54,7 @@ class Model(ABC):
         """
         pass
 
+    @abstractmethod
     def predict_obs_interactions(
         self,
     ) -> Float[ndarray, "n_timepoints n_cells n_cells"]:
@@ -67,6 +68,7 @@ class Model(ABC):
         """
         pass
 
+    @abstractmethod
     def predict_y_train(
         self,
     ) -> Float[ndarray, "n_timepoints n_cells"]:
