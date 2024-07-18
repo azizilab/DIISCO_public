@@ -32,9 +32,9 @@ class Discretizer(ABC):
     def __call__(
         self,
         t: Float[ndarray, " n_timepoints"],
-        y: Float[ndarray, " n_timepoints, n_cells"],
-        interactions: Float[ndarray, " n_timepoints, n_cells, n_cells"],
-    ) -> Int[ndarray, " n_timepoints, n_cells, n_cells"]:
+        y: Float[ndarray, " n_timepoints n_cells"],
+        interactions: Float[ndarray, " n_timepoints, n_cells n_cells"],
+    ) -> Int[ndarray, " n_timepoints, n_cells n_cells"]:
         self.check_shapes(t, y, interactions)
         transformed_interactions = self.transform_interactions(t, y, interactions)
         return self.discretize(transformed_interactions)
@@ -44,7 +44,7 @@ class Discretizer(ABC):
 
     def discretize(
         self,
-        transformed_interactions: Float[ndarray, " n_timepoints, n_cells, n_cells"],
+        transformed_interactions: Float[ndarray, " n_timepoints n_cells n_cells"],
     ) -> Int[ndarray, " n_timepoints, n_cells, n_cells"]:
         """
         Recieves, timepoints, observed values of the cells, and the predicted interactions
@@ -66,8 +66,8 @@ class Discretizer(ABC):
     def transform_interactions(
         self,
         t: Float[ndarray, " n_timepoints"],
-        y: Float[ndarray, " n_timepoints, n_cells"],
-        interactions: Float[ndarray, " n_timepoints, n_cells, n_cells"],
+        y: Float[ndarray, " n_timepoints n_cells"],
+        interactions: Float[ndarray, " n_timepoints n_cells n_cells"],
     ) -> Float[ndarray, " n_timepoints, n_cells, n_cells"]:
         """
         Tranforms the interactions before discretizing them.
@@ -78,8 +78,8 @@ class Discretizer(ABC):
     def _check_shapes(
         self,
         t: Float[ndarray, " n_timepoints"],
-        y: Float[ndarray, " n_timepoints, n_cells"],
-        interactions: Float[ndarray, " n_timepoints, n_cells, n_cells"],
+        y: Float[ndarray, " n_timepoints n_cells"],
+        interactions: Float[ndarray, " n_timepoints n_cells n_cells"],
     ) -> None:
         """
         Check that the input shapes are as expected.
@@ -114,9 +114,9 @@ class MultiplicationDiscretizer(Discretizer):
     def transform_interactions(
         self,
         t: Float[ndarray, " n_timepoints"],
-        y: Float[ndarray, " n_timepoints, n_cells"],
-        interactions: Float[ndarray, " n_timepoints, n_cells, n_cells"],
-    ) -> Float[ndarray, " n_timepoints, n_cells, n_cells"]:
+        y: Float[ndarray, " n_timepoints n_cells"],
+        interactions: Float[ndarray, " n_timepoints n_cells n_cells"],
+    ) -> Float[ndarray, " n_timepoints n_cells n_cells"]:
 
         self._check_shapes(t, y, interactions)
         n_timepoints, n_cells = y.shape

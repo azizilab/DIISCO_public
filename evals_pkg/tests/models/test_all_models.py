@@ -10,29 +10,18 @@ from sklearn.metrics import r2_score
     "model_class, linear_data, model_config",
     [
         (LinearModel, True, {}),
-        (RollingLinearModel, True, {"min_points_per_regression": 10}),
-        (RollingLinearModel, False, {"min_points_per_regression": 10}),
+        (RollingLinearModel, True, {"min_points_per_regression": 20, "use_bias": False}),
+        (RollingLinearModel, False, {"min_points_per_regression": 20, "use_bias": False}),
     ],
 )
 def test_sanity_models(model_class: Model, linear_data: bool, model_config: dict):
-    n_timepoints = 50
+    n_timepoints = 100
     n_cells = 4
 
     model = model_class(**model_config)
-    t, y = _generate_dummy_data(n_cells, n_timepoints, linear=linear_data)
-    is_active = np.ones((n_cells, n_cells)) - np.eye(
-        n_cells
-    )  # All edges are active underspecified (except diag)
+    t, y, is_active_true, is_active_used = _generate_dummy_data(n_cells, n_timepoints, linear=linear_data)
 
-    model.fit(t, y, is_active)
-
-    # Check that the interactions have the correct shape
-    interactions = model.predict_interactions(t, y)
-    assert interactions.shape == (n_timepoints, n_cells, n_cells)
-
-    # Check that the interactions at known timepoints have the correct shape
-    obs_interactions = model.predict_obs_interactions()
-    assert obs_interactions.shape == (n_timepoints, n_cells, n_cells)
+    model.fit(t, y, is_active_used)
 
     # Check that the predictions have the right shape
     y_train_pred = model.predict_y_train()
@@ -47,22 +36,32 @@ def test_sanity_models(model_class: Model, linear_data: bool, model_config: dict
     y_true_1 = y[:, 1].flatten()
     assert r2_score(y_true_1, y_pred_1) > 0.9
 
+    # Check that the interactions have the correct shape
+    interactions = model.predict_interactions(t, y)
+    assert interactions.shape == (n_timepoints, n_cells, n_cells)
+
+    # Check that the interactions at known timepoints have the correct shape
+    obs_interactions = model.predict_obs_interactions()
+    assert obs_interactions.shape == (n_timepoints, n_cells, n_cells)
+
+
     # Check that the interactions are correct
     # the only interactions that should be non-zero are between cell 0 and cell 1
+    threshold = 0.5
     for timepoint in range(n_timepoints):
-        for cell in range(n_cells):
-            for other_cell in range(n_cells):
-                interaction_coeff = interactions[timepoint, cell, other_cell]
+        for out_cell in range(n_cells):
+            for in_cell in range(n_cells):
+                interaction_coeff = interactions[timepoint, out_cell, in_cell]
 
-                if is_active[cell, other_cell] == 0:
-                    assert interaction_coeff == 0
+                if is_active_used[out_cell, in_cell] == 0:
+                    assert interaction_coeff == 0, f"Expected 0 but got {interaction_coeff}"
 
-                # Only cell 1 and other cell 0 should have non-zero interactions
-                # in the matrix
-                if cell == 1 and other_cell == 0:
-                    msg = "Expected non-zero interaction between cell 1 and cell 0, "
-                    msg + f"but got {interaction_coeff} at timepoint {timepoint}"
-                    assert np.abs(interaction_coeff) > 1, msg
+                msg = f"Observed interaction between cell {out_cell} and cell {in_cell} "
+                msg += f"at timepoint {timepoint} is {interaction_coeff}, but expected {is_active_true[out_cell, in_cell]}"
+                if is_active_true[out_cell, in_cell] == 1:
+                    assert np.abs(interaction_coeff) > threshold, msg
+                else :
+                    assert np.abs(interaction_coeff) < threshold, msg
 
 
 def _generate_dummy_data(
@@ -77,6 +76,7 @@ def _generate_dummy_data(
         - The only interactions are between cell 0 and cell 1
         - For all the other cells the interactions are zero
         - The time is uniformly sampled
+        - The data is centered and scaled
 
     Parameters
     ----------
@@ -94,6 +94,13 @@ def _generate_dummy_data(
         The time points at which the data was sampled
     y : np.ndarray
         The observed values of the cells
+    is_active_true: np.ndarray
+        A matrix containing 1 if the edge is active, 0 otherwise. This
+        the actual true matrix of interactions
+    is_active_used: np.ndarray
+        A matrix containing 1 if the edge is active, 0 otherwise.
+        This is the matrix of interactions that the model should use when training.
+        It is much more sparse than is_active_true
     """
     np.random.seed(seed)
 
@@ -106,4 +113,19 @@ def _generate_dummy_data(
 
     # Add noise
     y += noise * np.random.randn(n_timepoints, n_cells)
-    return t, y
+
+    # Center
+    y = (y - np.mean(y, axis=0)) / np.std(y, axis=0)
+
+    # Create the is_active matrix
+    is_active_true = np.zeros((n_cells, n_cells))
+    is_active_true[0, 1] = 1
+    is_active_true[1, 0] = 1
+
+    # Create the is_active matrix
+    # We zero out the diagonal and the first column
+    # for the ones where it is not used to avoid colinearity issues
+    is_active_used = np.ones((n_cells, n_cells)) - np.eye(n_cells)
+    is_active_used[2:, 0] = 0
+
+    return t, y, is_active_true, is_active_used

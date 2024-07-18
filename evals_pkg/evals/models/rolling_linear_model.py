@@ -45,10 +45,12 @@ class RollingLinearModel(Model):
         self,
         min_points_per_regression: int = 3,
         num_searches_per_timepoint: int = 10,
+        use_bias: bool = False,
     ):
 
         self.min_points_per_regression = min_points_per_regression
         self.num_searches_per_timepoint = num_searches_per_timepoint
+        self.use_bias = use_bias
 
         self._is_active: Int[ndarray, "n_cells n_cells"] = None
         self._n_cells: int = None
@@ -111,6 +113,7 @@ class RollingLinearModel(Model):
                     timepoints=t,
                     epsilon=epsilon,
                     min_points_per_regression=self.min_points_per_regression,
+                    use_bias=self.use_bias,
                 )
                 loss = np.mean((y_pred - lm_y) ** 2)
                 if loss < best_loss:
@@ -146,6 +149,7 @@ class RollingLinearModel(Model):
                 timepoints=t_train,
                 epsilon=self._best_epsilon_per_cell[cell],
                 min_points_per_regression=self.min_points_per_regression,
+                use_bias=self.use_bias,
             )
 
         return y_train_pred
@@ -191,7 +195,6 @@ class RollingLinearModel(Model):
                 i for i in range(self._n_cells) if self._is_active[cell, i] == 1
             ]
             lm_X_train = self._y_train[:, active_cell_idx]
-            lm_X_pred = y[:, active_cell_idx]
             lm_y_train = self._y_train[:, cell]
             for t_num, t_instance in enumerate(t):
                 model = _get_rolling_linear_model(
@@ -201,6 +204,7 @@ class RollingLinearModel(Model):
                     t_train=self._t_train,
                     epsilon=self._best_epsilon_per_cell[cell],
                     min_points_per_regression=self.min_points_per_regression,
+                    use_bias=self.use_bias,
                 )
                 interaction_values[t_num, cell, active_cell_idx] = model.coef_
 
@@ -306,6 +310,7 @@ def _get_rolling_linear_model(
     t_train: Float[ndarray, " n_timepoints"],
     epsilon: float,
     min_points_per_regression: int,
+    use_bias: bool,
 ) -> LinearRegression:
     """ """
     X_used, y_used, _ = _get_datapoints_around_timepoint(
@@ -317,7 +322,7 @@ def _get_rolling_linear_model(
         min_points_per_regression=min_points_per_regression,
     )
 
-    model = LinearRegression()
+    model = LinearRegression(fit_intercept=use_bias)
     model.fit(X_used, y_used)
     return model
 
@@ -330,6 +335,7 @@ def _predict_one_point_with_rolling_linear_model(
     t_train: Float[ndarray, " n_timepoints"],
     epsilon: float,
     min_points_per_regression: int,
+    use_bias: bool,
 ) -> Float[ndarray, " "]:
     """
     Trains a linear model using the data in X_train and y_train and
@@ -345,6 +351,7 @@ def _predict_one_point_with_rolling_linear_model(
         t_train=t_train,
         epsilon=epsilon,
         min_points_per_regression=min_points_per_regression,
+        use_bias=use_bias,
     )
     y_pred = model.predict(X_to_pred.reshape(1, -1))
     return y_pred.flatten()[0]
@@ -356,6 +363,7 @@ def _looc_preds_for_rolling_linear_model(
     timepoints: Float[ndarray, " n_timepoints"],
     epsilon: float,
     min_points_per_regression: int,
+    use_bias: bool,
 ) -> Float[ndarray, " n_timepoints"]:
     """ """
     y_preds = np.zeros(y.shape)
@@ -375,6 +383,7 @@ def _looc_preds_for_rolling_linear_model(
             t_train=timepoints_without_i,
             epsilon=epsilon,
             min_points_per_regression=min_points_per_regression,
+            use_bias=use_bias,
         )
 
     return y_preds
