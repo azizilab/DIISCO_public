@@ -103,6 +103,10 @@ def parse_args() -> argparse.Namespace:
     msg = "Whether to not save the results of the experiment"
     parser.add_argument("--no-save", action="store_true", help=msg)
 
+    msg = "Any additional hyper-parameters for the model to be used. "
+    msg += "Should be in the form <parameter-name> <parameter-value>"
+    parser.add_argument("--model-parameters", nargs="*", help=msg)
+
     # --------------------------------------------------
     # Arguments for evaluating the model
     # --------------------------------------------------
@@ -171,6 +175,16 @@ def make_model_config(model_cls: Model, args: argparse.Namespace) -> dict:
 
         assert "y_length_scale" in config
         config["y_length_scale"] = args.length_scale
+
+    # Add additional modle parameters
+    if args.model_parameters is not None:
+        for i in range(0, len(args.model_parameters), 2):
+            # Assume that the model parameters are in the form --<parameter-name> <parameter-value>
+            key = args.model_parameters[i]
+            value = args.model_parameters[i + 1]
+            assert key in config, f"Parameter {key} not found in the model configuration"
+            value_type = type(config[key])
+            config[key] = value_type(value)
 
     return config
 
