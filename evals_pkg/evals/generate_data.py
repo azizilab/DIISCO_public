@@ -28,11 +28,12 @@ class SampledData:
 
 def generate_data(
     n_blocks: int = 30,
-    n_indepenent_per_block: int = 10,
+    n_independent_per_block: int = 10,
     n_dependent_per_block: int = 10,
     n_timepoints: int = 100,
     noise: float = 0.1,
     length_scale: float = 1,
+    weights_length_scale: float = 3,
     seed: int = 0,
     p_active: float = 0.1,
     flip_prob_active: float = 0.1,
@@ -81,8 +82,7 @@ def generate_data(
     """
     np.random.seed(seed)
 
-    weights_length_scale = length_scale * 3
-    block_size = n_indepenent_per_block + n_dependent_per_block
+    block_size = n_independent_per_block + n_dependent_per_block
     total_cells = n_blocks * block_size
 
     weights = np.zeros((n_timepoints, total_cells, total_cells))
@@ -107,10 +107,11 @@ def generate_data(
     # Now we repace the dependent variables with actual values
     for block in range(n_blocks):
         independent_block = np.arange(
-            block * block_size, block * block_size + n_indepenent_per_block
+            block * block_size, block * block_size + n_independent_per_block
         )
         dependent_block = np.arange(
-            block * block_size + n_indepenent_per_block, block * block_size + block_size
+            block * block_size + n_independent_per_block,
+            block * block_size + block_size,
         )
         other_blocks = np.setdiff1d(
             np.arange(total_cells), np.concatenate([independent_block, dependent_block])
@@ -125,11 +126,11 @@ def generate_data(
 
         for cell in dependent_block:
             active_independent_cells_mask = (
-                np.random.rand(n_indepenent_per_block) < p_active
+                np.random.rand(n_independent_per_block) < p_active
             )
             if not np.any(active_independent_cells_mask):
                 active_independent_cells_mask[
-                    np.random.randint(0, n_indepenent_per_block)
+                    np.random.randint(0, n_independent_per_block)
                 ] = True
 
             for timepoint in range(n_timepoints):
@@ -178,7 +179,7 @@ def create_model_prior_from_true_interactions(
     """
     It creates a model prior from the true interactions.
     The model prior has the following characteristics:
-        - It is only one prior for all timepoints
+        - We have only one prior for all timepoints.
         - The correct model prior contains 1 if at any timepoint the edge is active
         - Any cell that has no other interactions has a 1 in the diagonal
         - It is a noiser version of the true interactions matrix
@@ -201,11 +202,12 @@ def create_model_prior_from_true_interactions(
             if should_flip:
                 model_prior[i, j] = 1 - model_prior[i, j]
 
-    # Ensure the diagonal is 1 of cells that have no other interactions
+    # If a cell has no interaction randomly assing one
     for cell in range(total_cells):
         if np.all(model_prior[cell] == 0):
-            model_prior[cell, cell] = 1
+            model_prior[cell, np.random.randint(0, total_cells)] = 1
 
+    print("\n\nmodel_prior cmi\n\n", model_prior)
     return model_prior
 
 
@@ -223,7 +225,7 @@ def create_true_interactions_from_dependent_computations(
 
     Returns
     -------
-    is_active_matrix : np.ndarray
+    true_interactions:
         The is_active_matrix containing 1 if the edge is active, 0 otherwise
         of shape (n_timepoints, total_cells, total_cells). In particular,
         this matrix is symmetric the diagonal is 0. We say that
@@ -231,8 +233,11 @@ def create_true_interactions_from_dependent_computations(
         cells j -> j_1 -> j_2 -> ... -> i where either j_k -> j_{k+1} is active
         or j_{k+1} -> j_k is active. An edge is active if the absolute value
         of the weight is greater than the threshold.In other words we check if they
-        are reachable. By convention the diagonals are always 0.
+        are reachable. By convention
+            true_interactions[t, i, i] = 1 if and only if weights[t, i, i] = 1.
+        This ensure that the independent values get  counted adequately.
     """
+    print("\n\nweights cti\n\n", weights[0])
     n_timepoints, total_cells, _ = weights.shape
     reachability_matrix = np.zeros((n_timepoints, total_cells, total_cells))
 
@@ -249,7 +254,17 @@ def create_true_interactions_from_dependent_computations(
             reachability_matrix[t], 1 - np.eye(total_cells)
         )
 
-    return reachability_matrix
+    # set the diagonal to 0
+    true_interactions = reachability_matrix
+    original_diagonals = is_active_matrix[
+        :, np.arange(total_cells), np.arange(total_cells)
+    ].astype(int)
+    true_interactions[
+        :, np.arange(total_cells), np.arange(total_cells)
+    ] = original_diagonals
+
+    print("\n\ntrue_interactions cti\n\n", true_interactions[0])
+    return true_interactions
 
 
 def compute_reachability_matrix(

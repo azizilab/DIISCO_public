@@ -14,7 +14,7 @@ def test_generate_data():
     np.random.seed(0)
 
     n_blocks = 2
-    n_indepenent_per_block = 2
+    n_independent_per_block = 2
     n_dependent_per_block = 1
     n_timepoints = 100
     noise = 0.001
@@ -26,7 +26,7 @@ def test_generate_data():
 
     sampled_data: SampledData = generate_data(
         n_blocks=n_blocks,
-        n_indepenent_per_block=n_indepenent_per_block,
+        n_independent_per_block=n_independent_per_block,
         n_dependent_per_block=n_dependent_per_block,
         n_timepoints=n_timepoints,
         noise=noise,
@@ -38,7 +38,7 @@ def test_generate_data():
     )
 
     # check that the data is generated correctly
-    block_size = n_indepenent_per_block + n_dependent_per_block
+    block_size = n_independent_per_block + n_dependent_per_block
     total_cells = n_blocks * block_size
 
     # check the shapes

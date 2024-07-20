@@ -114,8 +114,12 @@ class LinearModel(Model):
             active_cell_idx = [
                 i for i in range(self._n_cells) if self._is_active[cell, i] == 1
             ]
+            print("cell", cell, "active_cell_idx", active_cell_idx)
+            print("self._models[cell].coef_", self._models[cell].coef_)
             interaction_values[:, cell, active_cell_idx] = self._models[cell].coef_
 
+        # round to the nearest integer
+        interaction_values = np.round(interaction_values, 2)
         return interaction_values
 
     def predict_obs_interactions(
