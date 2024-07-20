@@ -19,11 +19,14 @@ from evals.metrics import (
     evaluate_predicted_observations,
     ObservationMetrics,
 )
+from evals.models import DiiscoModel
 
 import os
 import namesgenerator
 import numpy as np
 import uuid
+import torch
+
 
 # import torch
 
@@ -105,7 +108,7 @@ def parse_args() -> argparse.Namespace:
     # --------------------------------------------------
     msg = "Which model to use for the experiment"
     parser.add_argument(
-        "-model",
+        "--model",
         type=str,
         choices=list(get_models_dict().keys()),
         default=list(get_models_dict().keys())[0],
@@ -149,12 +152,35 @@ def create_and_return_save_pth(job_dir: str, experiment_name: str, run_name) -> 
     return save_pth
 
 
+def make_model_config(model_cls: Model, args: argparse.Namespace) -> dict:
+    """
+    Gets the model configuration, including default parameters
+    and any neccesary extra configurations that depend on args
+
+    Returns
+    -------
+    config: dict
+        The configuration for the model.
+    """
+    config = get_default_parameters(model_cls)
+
+    # Check if the class is a DiiscoModel
+    if model_cls == DiiscoModel:
+        assert "w_length_scale" in config
+        config["w_length_scale"] = args.weights_length_scale
+
+        assert "y_length_scale" in config
+        config["y_length_scale"] = args.length_scale
+
+    return config
+
+
 def set_seed(seed: int):
     """
     Set the seed for numpy and pytorch
     """
     np.random.seed(seed)
-    # torch.manual_seed(seed)
+    torch.manual_seed(seed)
 
 
 def main():
@@ -177,7 +203,7 @@ def main():
     )
 
     model_cls = get_models_dict()[args.model]
-    config = get_default_parameters(model_cls)
+    config = make_model_config(model_cls, args)
     model = model_cls(**config)
 
     model.fit(
@@ -191,14 +217,14 @@ def main():
         observations=dataset.observations,
         timepoints=dataset.timepoints,
     )
-    print("\n\ninteraction_score", interaction_score.astype(int)[0])
-    print("\n\ntrue_interactions", dataset.true_interactions.astype(int)[0])
+    # print("\n\ninteraction_score", interaction_score.astype(int)[0])
+    # print("\n\ntrue_interactions", dataset.true_interactions.astype(int)[0])
 
     true_observations = dataset.observations
     predicted_observations = model.predict_y_train()
 
-    print("\n\ntrue_observations", true_observations)
-    print("\n\npredicted_observations", predicted_observations)
+    # print("\n\ntrue_observations", true_observations)
+    # print("\n\npredicted_observations", predicted_observations)
 
     observation_metrics: ObservationMetrics = evaluate_predicted_observations(
         true_observations=true_observations,

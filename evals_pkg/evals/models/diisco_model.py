@@ -15,6 +15,7 @@ _DEFAULT_DTYPE = torch.float64
 _DEFAULT_GUIDE = "MultivariateNormalFactorized"
 _SUBSAMPLE_PROPORTION = 0.5
 
+
 @register_model
 class DiiscoModel(Model):
     """
@@ -24,17 +25,17 @@ class DiiscoModel(Model):
 
     def __init__(
         self,
-        w_length_scale : float = 3.0,
-        w_length_scale_range : float = 2.0,
-        w_variance : float = 3.0,
-        y_length_scale : float= 3,
-        y_variance  : float = 3.0,
-        y_sigma : float = 0.2,
-        lr : float = 0.0001,
-        verbose : bool = False,
-        verbose_freq : bool = 10,
-        patience : int = 5000,
-        n_iter : int = 100000,
+        w_length_scale: float = 3.0,
+        w_length_scale_range: float = 1.0,
+        w_variance: float = 3.0,
+        y_length_scale: float = 3,
+        y_variance: float = 3.0,
+        y_sigma: float = 0.2,
+        lr: float = 0.0001,
+        verbose: bool = False,
+        verbose_freq: bool = 10,
+        patience: int = 5000,
+        n_iter: int = 50_000,
     ):
         """
         The conventions for the hyper-parameters are according to best practices.
@@ -100,7 +101,7 @@ class DiiscoModel(Model):
         self.y_sigma = y_sigma
         self.f_sigma = y_sigma
         self.f_length_scale = y_length_scale
-        self.f_variance = y_variance # (f and y are the same essentially)
+        self.f_variance = y_variance  # (f and y are the same essentially)
 
         # OPTIMIZATION HYPER-PARAMETERS
         # All hyper-parameters used for optimization
@@ -112,14 +113,14 @@ class DiiscoModel(Model):
 
         # CLASS VARIABLES
         # All variables used by this class
-        self._model : external_diisco.DIISCO = None
-        self._is_fitted : bool = False
-        self._n_cells_train : int = None
-        self._n_timepoints_train : int = None
-        self._t_train : Float[ndarray, " n_timepoints"] = None
-        self._y_train : Float[ndarray, "n_timepoints n_cells"] = None
+        self._model: external_diisco.DIISCO = None
+        self._is_fitted: bool = False
+        self._n_cells_train: int = None
+        self._n_timepoints_train: int = None
+        self._t_train: Float[ndarray, " n_timepoints"] = None
+        self._y_train: Float[ndarray, "n_timepoints n_cells"] = None
         # Variable for caching the means of the interactions
-        self._train_means : dict = None
+        self._train_means: dict = None
 
     def fit(
         self,
@@ -167,27 +168,23 @@ class DiiscoModel(Model):
         is_active_tensor = torch.tensor(is_active, dtype=_DEFAULT_DTYPE)
 
         self._model = external_diisco.DIISCO(
-            lambda_matrix = is_active_tensor,
-            hypers_init_vals = hyperparameters,
-            use_bias = self.use_bias,
-            verbose = self.verbose,
-            verbose_freq = self.verbose_freq,
+            lambda_matrix=is_active_tensor,
+            hypers_init_vals=hyperparameters,
+            verbose=self.verbose,
+            verbose_freq=self.verbose_freq,
         )
 
         self._model.fit(
-            timepoints = t_tensor,
-            proportions = y_tensor,
-            n_iter = self.n_iter,
-            lr = self.lr,
-            patience = self.patience,
-            guide = _DEFAULT_GUIDE,
+            timepoints=t_tensor,
+            proportions=y_tensor,
+            n_iter=self.n_iter,
+            lr=self.lr,
+            patience=self.patience,
+            guide=_DEFAULT_GUIDE,
             subsample_size=int(_SUBSAMPLE_PROPORTION * t.shape[0]),
         )
 
         self._is_fitted = True
-
-
-
 
     def predict_interactions(
         self,
@@ -214,7 +211,6 @@ class DiiscoModel(Model):
         """
         raise NotImplementedError("This method has not been implemented yet.")
 
-
     def predict_obs_interactions(
         self,
     ) -> Float[ndarray, "n_timepoints n_cells n_cells"]:
@@ -231,7 +227,11 @@ class DiiscoModel(Model):
 
         means = self._get_train_means()
         W_mean = means[names.W]
-        assert W_mean.shape == (self._n_timepoints_train, self._n_cells_train, self._n_cells_train)
+        assert W_mean.shape == (
+            self._n_timepoints_train,
+            self._n_cells_train,
+            self._n_cells_train,
+        )
         return W_mean
 
     def predict_y_train(
@@ -253,7 +253,6 @@ class DiiscoModel(Model):
         assert Y_mean.shape == (self._n_timepoints_train, self._n_cells_train)
         return Y_mean
 
-
     def _get_train_means(self):
         """
         Returns the means of the interactions at the timepoints used during the
@@ -263,9 +262,16 @@ class DiiscoModel(Model):
             raise ValueError("The model has not been fitted yet.")
 
         if self._train_means is None:
-                t_tensor = torch.tensor(self._t_train, dtype=_DEFAULT_DTYPE).reshape(-1, 1)
-                self._train_means : dict = self._model.get_means(timepoints = t_tensor)
-                # convert to numpy
-                self._train_means = {key: val.detach().numpy() for key, val in self._train_means.items()}
+            t_tensor = torch.tensor(self._t_train, dtype=_DEFAULT_DTYPE).reshape(-1, 1)
+            self._train_means: dict = self._model.get_means(timepoints=t_tensor)
+            self._train_means = {
+                key: val
+                for key, val in self._train_means.items()
+                if key in [names.W, names.Y]
+            }
+            # convert to numpy
+            self._train_means = {
+                key: val.detach().numpy() for key, val in self._train_means.items()
+            }
 
         return self._train_means
