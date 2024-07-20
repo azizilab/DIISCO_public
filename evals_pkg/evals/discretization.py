@@ -27,20 +27,15 @@ class Discretizer(ABC):
         Deviations from the mean to consider as active.
     count_zeros : bool
         Whether to count zeros for the computation of the standard deviation.
-    standardize : bool
-        Whether to standardize the interactions by the total value. In other words the
-        the strength of the interaction is measured by w_i * y_i / y_j
     """
 
     def __init__(
         self,
         std_deviations: float = 1,
         count_zeros: bool = True,
-        standardize: bool = True,
     ):
         self.std_deviations = std_deviations
         self.count_zeros = count_zeros
-        self.standardize = standardize
 
     def __call__(
         self,
@@ -65,7 +60,8 @@ class Discretizer(ABC):
         at that timepoint or not.
 
         Discretizes the interactions by computing the std and choosing the interactions
-        that are above a certain number of std deviations from the mean.
+        that are above a certain number of std deviations from the mean. The
+        matrix is then made symmetric by taking the maximum of the two values.
         """
         # Just for safety
         transformed_interactions = np.abs(transformed_interactions)
@@ -77,7 +73,10 @@ class Discretizer(ABC):
             values = flat_cell_interactions[flat_cell_interactions != 0]
             cell_std = values.std()
 
-        return (transformed_interactions > self.std_deviations * cell_std).astype(int)
+        discretized = (
+            transformed_interactions > self.std_deviations * cell_std
+        ).astype(int)
+        return np.maximum(discretized, discretized.transpose(0, 2, 1))
 
     @abstractmethod
     def transform_interactions(
@@ -133,9 +132,8 @@ class AbsoluteValueDiscretizer(Discretizer):
         self,
         std_deviations: float = 1,
         count_zeros: bool = True,
-        standardize: bool = True,
     ):
-        super().__init__(std_deviations, count_zeros, standardize)
+        super().__init__(std_deviations, count_zeros)
 
     def transform_interactions(
         self,
