@@ -12,8 +12,8 @@ from evals.models.base import register_model
 _DEFAULT_TENSOR_TYPE = torch.DoubleTensor
 _DEFAULT_DTYPE = torch.float64
 
-_DEFAULT_GUIDE = "MultivariateNormalFactorized"
-_SUBSAMPLE_PROPORTION = 0.5
+_DEFAULT_GUIDE = "DiagonalNormal"
+_SUBSAMPLE_PROPORTION = 1
 
 
 @register_model
@@ -32,10 +32,10 @@ class DiiscoModel(Model):
         y_variance: float = 3.0,
         y_sigma: float = 0.2,
         lr: float = 0.0001,
-        verbose: bool = False,
-        verbose_freq: bool = 10,
+        verbose: bool = True,
+        verbose_freq: bool = 100,
         patience: int = 5000,
-        n_iter: int = 50_000,
+        n_iter: int = 100_000,
     ):
         """
         The conventions for the hyper-parameters are according to best practices.
@@ -225,7 +225,7 @@ class DiiscoModel(Model):
         if not self._is_fitted:
             raise ValueError("The model has not been fitted yet.")
 
-        means = self._get_train_means()
+        means = self._get_train_means_alternative()
         W_mean = means[names.W]
         assert W_mean.shape == (
             self._n_timepoints_train,
@@ -248,7 +248,7 @@ class DiiscoModel(Model):
         if not self._is_fitted:
             raise ValueError("The model has not been fitted yet.")
 
-        means = self._get_train_means()
+        means = self._get_train_means_alternative()
         Y_mean = means[names.Y]
         assert Y_mean.shape == (self._n_timepoints_train, self._n_cells_train)
         return Y_mean
@@ -275,3 +275,23 @@ class DiiscoModel(Model):
             }
 
         return self._train_means
+
+
+    def _get_train_means_alternative(self):
+        if not self._is_fitted:
+            raise ValueError("The model has not been fitted yet.")
+
+        if self._train_means is None:
+            W = self._model.get_W_mean(n_samples=100)
+            f = self._model.get_f_mean(n_samples=100)
+            assert W.shape == (self._n_cells_train, self._n_cells_train, self._n_timepoints_train)
+            assert f.shape == (self._n_timepoints_train, self._n_cells_train)
+
+            W  = W.permute(2, 0, 1)
+            Y = torch.matmul(W, f.unsqueeze(-1)).squeeze(-1)
+            self._train_means = {names.W: W.detach().numpy(), names.Y: Y.detach().numpy()}
+
+        return self._train_means
+
+
+

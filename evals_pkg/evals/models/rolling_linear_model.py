@@ -46,11 +46,13 @@ class RollingLinearModel(Model):
         min_points_per_regression: int = 3,
         num_searches_per_timepoint: int = 10,
         use_bias: bool = False,
+        ignore_is_active: bool = False,
     ):
 
         self.min_points_per_regression = min_points_per_regression
         self.num_searches_per_timepoint = num_searches_per_timepoint
         self.use_bias = use_bias
+        self.ignore_is_active = ignore_is_active
 
         self._is_active: Int[ndarray, "n_cells n_cells"] = None
         self._n_cells: int = None
@@ -66,7 +68,7 @@ class RollingLinearModel(Model):
         self,
         t: Float[ndarray, " n_timepoints"],
         y: Float[ndarray, "n_timepoints n_cells"],
-        is_active: Int[ndarray, "n_cells n_cells"],
+        is_active: Int[ndarray, "n_cells n_cells"]=None,
     ) -> None:
         """
         Fits the model to the data by saving the observed values of the cells
@@ -82,6 +84,9 @@ class RollingLinearModel(Model):
         is_active:
             A matrix containing 1 if the edge is active, 0 otherwise
         """
+        if self.ignore_is_active:
+            is_active = np.ones((y.shape[1], y.shape[1]))
+
         check_fit_inputs(t, y, is_active)
 
         self._is_active = is_active

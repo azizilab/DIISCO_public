@@ -176,7 +176,10 @@ def make_model_config(model_cls: Model, args: argparse.Namespace) -> dict:
         assert "y_length_scale" in config
         config["y_length_scale"] = args.length_scale
 
-    # Add additional modle parameters
+        assert "y_sigma" in config
+        config["y_sigma"] = args.noise /2
+
+    # Add additional model parameters
     if args.model_parameters is not None:
         for i in range(0, len(args.model_parameters), 2):
             # Assume that the model parameters are in the form --<parameter-name> <parameter-value>
@@ -184,7 +187,10 @@ def make_model_config(model_cls: Model, args: argparse.Namespace) -> dict:
             value = args.model_parameters[i + 1]
             assert key in config, f"Parameter {key} not found in the model configuration"
             value_type = type(config[key])
-            config[key] = value_type(value)
+            if value_type == bool:
+                config[key] = value == "True"
+            else:
+                config[key] = value_type(value)
 
     return config
 
@@ -264,6 +270,9 @@ def main():
         prc_auc=interaction_metrics.prc_auc,
         symmetrical_auc=interaction_metrics.symmetrical_auc,
         symmetrical_prc_auc=interaction_metrics.symmetrical_prc_auc,
+        true_interactions=interaction_metrics.true_interactions,
+        transformed_interactions=interaction_metrics.transformed_interactions,
+        symmetrical_transformed_interactions=interaction_metrics.symmetrical_transformed_interactions,
         # Metrics pertaining the dataset
         n_cells=dataset.observations.shape[1],
         n_timepoints=dataset.observations.shape[0],

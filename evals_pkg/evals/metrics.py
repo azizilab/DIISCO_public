@@ -22,9 +22,9 @@ from sklearn.metrics import (
 import numpy as np
 
 
-MIN_STDS = 0.1
+MIN_STDS = 0.0
 MAX_STDS = 5
-N_STDS = 10
+N_STDS = int((MAX_STDS - MIN_STDS) * 2 + 1) # (0, 0.5, 1, 1.5, ..., 5)
 
 
 @dataclass
@@ -47,6 +47,12 @@ class InteractionMetrics:
     symmetrical_prc_auc: float  # same as prc_auc but we symmetrize the interactions
     # The index of the best std according to the AUC
     best_std: int
+    # True, transformed and non-transformed interactions
+    # are not flattened
+    true_interactions: list[int]
+    transformed_interactions: list[int]
+    symmetrical_transformed_interactions: list[int]
+
 
 
 @dataclass
@@ -149,7 +155,11 @@ def evaluate_predicted_interactions(
         best_std=best_std,
         symmetrical_auc=symmetrical_auc,
         symmetrical_prc_auc=symmetrical_prc_auc,
+        true_interactions=true_interactions.flatten().tolist(),
+        transformed_interactions=transformed_interactions.flatten().tolist(),
+        symmetrical_transformed_interactions= symmetrical_transformed_interactions.flatten().tolist()
     )
+
 
 
 def evaluate_predicted_observations(

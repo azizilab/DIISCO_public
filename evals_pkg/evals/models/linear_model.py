@@ -26,9 +26,12 @@ class LinearModel(Model):
     ----------
     use_bias : bool
         Whether to use a bias term in the linear model.
+    ignore_is_active : bool
+        Whether to ignore the is_active matrix and use all cells to predict
+        the value of cell i.
     """
 
-    def __init__(self, use_bias: bool = False):
+    def __init__(self, use_bias: bool = False, ignore_is_active: bool = False):
         self._use_bias = use_bias
 
         self._models: list[LinearRegression] = []  # len(models) == n_cells
@@ -36,6 +39,7 @@ class LinearModel(Model):
         self._n_cells: int = None
         self._n_timepoints: int = None
         self._is_fitted: bool = False
+        self._ignore_is_active = ignore_is_active
 
         self._t_train: Float[ndarray, " n_timepoints"] = None
         self._y_train: Float[ndarray, "n_timepoints n_cells"] = None
@@ -44,7 +48,7 @@ class LinearModel(Model):
         self,
         t: Float[ndarray, " n_timepoints"],
         y: Float[ndarray, "n_timepoints n_cells"],
-        is_active: Int[ndarray, "n_cells n_cells"],
+        is_active: Int[ndarray, "n_cells n_cells"]=None,
     ) -> None:
         """
         Parameters
@@ -56,6 +60,9 @@ class LinearModel(Model):
         is_active:
             A matrix containing 1 if the edge is active, 0 otherwise
         """
+        if self._ignore_is_active:
+            is_active = np.ones((y.shape[1], y.shape[1]))
+
         check_fit_inputs(t, y, is_active)
 
         self._n_timepoints = t.shape[0]

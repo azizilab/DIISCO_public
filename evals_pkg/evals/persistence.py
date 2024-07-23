@@ -28,6 +28,10 @@ class RunResults:
     prc_auc: float
     symmetrical_auc: float
     symmetrical_prc_auc: float
+    # holds the predictions of the interactions
+    true_interactions: list[int]
+    transformed_interactions: list[int]
+    symmetrical_transformed_interactions: list[int]
 
     # Metrics pertaining the dataset
     n_cells: int
@@ -78,6 +82,10 @@ def print_run_results(run_results: RunResults):
     run_results_str += "Run Results\n"
     run_results_str += bars
     for key, value in run_results.__dict__.items():
+        # if its a list and its too long we don't print it
+        if isinstance(value, list) and len(value) > 15:
+            value = value[:15]
+
         run_results_str += f"{key}: {value}\n"
     run_results_str += bars
     run_results_str += space_between_results
