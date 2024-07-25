@@ -89,7 +89,7 @@ def generate_data(
     # m[t, i, j] = 1 if i is computed from j at time t
     observations = np.zeros((n_timepoints, total_cells))
 
-    timepoints = np.linspace(0, 1, n_timepoints)
+    timepoints = np.random.uniform(0, 1, n_timepoints)
 
     # Fill in the weights matrix
     for i in range(total_cells):

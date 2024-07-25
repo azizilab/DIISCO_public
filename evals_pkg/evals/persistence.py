@@ -45,6 +45,12 @@ class RunResults:
     threshold_for_active: float
     seed: int
 
+    # Dataset stuff
+    weights: list[list[list[float]]] # n_timepoints x n_cells x n_cells
+    standardized_observations : list[list[float]] # n_timepoints x n_cells
+    observations : list[list[float]] # n_timepoints x n_cells
+    timepoints : list[float] # n_timepoints
+
     # metric pertaining the model itself
     model_name: str
     config: dict

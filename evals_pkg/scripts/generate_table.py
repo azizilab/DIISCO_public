@@ -15,6 +15,7 @@ import argparse
 from evals.persistence import load_run_results, RunResults, print_run_results
 import os
 import numpy as np
+import re
 
 METRICS = [
     "AUC",
@@ -51,12 +52,12 @@ def parse_args():
         required=True,
         help="Path to the job directory",
     )
-    #parser.add_argument(
-    #    "--output-path",
-    #    type=str,
-    #    required=True,
-    #    help="Path to the output file",
-    #)
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        required=True,
+        help="Path to the output file",
+    )
     return parser.parse_args()
 
 def get_data(job_dir: str) -> dict[str,list[RunResults]]:
@@ -78,16 +79,34 @@ def get_data(job_dir: str) -> dict[str,list[RunResults]]:
     return data
 
 
+
 def make_model_name(run: RunResults) -> str:
     model_name = run.model_name
     if model_name == "DiiscoModel":
         model_name += "_lr_" + str(run.config["lr"])
     else:
-        model_name +=  str(run.config["ignore_is_active"])
+        if run.config["ignore_is_active"] == True:
+            model_name += ""
+        else:
+            model_name += " w/ Prior"
+
+    # Add a space before each capital letter
+    model_name = " ".join(re.findall('[A-Z][^A-Z]*', model_name))
     return model_name
 
 def format_name(name: str) -> str:
-    return name.replace("_", " ")
+    name = name.replace("_", " ")
+    # capitalize first letter
+    name = name[0].upper() + name[1:]
+    # remove the name Model
+    name = name.replace("Model", "")
+    # remove lr
+    name = name.replace("lr", "")
+    # remove w/
+    name = name.replace("w/", "")
+    return name
+
+
 
 def make_dicts_for_table(
     data: dict[str,list[RunResults]]
@@ -151,7 +170,7 @@ def should_be_bolded(
             return False
     return True
 
-def make_table(
+def make_latex_table(
     rows: dict[str, dict[str, dict[str, list[float]]]],
     metrics: list[str],
 ) -> str:
@@ -163,28 +182,15 @@ def make_table(
     n_models = len(first_row)
     n_metrics = len(metrics)
     n_experiments = len(rows)
-    model_names = list(first_row.keys())
+    model_names = sorted(list(first_row.keys()))
 
     table = "\\begin{table}[!h]\n"
     table += "\\centering\n"
     table += f"\\caption{{Model Performance: {METRIC_TO_CAPTION[metrics[0]]}}}\n"
     table += "\\begin{tabular}{" + "c" * (n_models * n_metrics + 1) + "}\n"
     table += "\\toprule\n"
-    #table += "\\multirow{1}{*}{} "a
 
-    # Add the Big Metric names
-    #for metric in metrics:
-    #    table += f"& \\multicolumn{{{n_models}}}{{c}}{{{metric}}}"
-    #table += "\\\\\n"
 
-    # Add midrule
-    #for i in range(n_metrics):
-    #    start = 2 + i * n_models
-    #    end = start + n_models
-    #    table += f"\\cmidrule(lr){{{start}-{end}}} "
-    #table += "\n"
-
-    # Add the model names
     for _ in range(n_metrics):
         for model_name in model_names:
             table += f"& {format_name(model_name)} "
@@ -192,8 +198,8 @@ def make_table(
     table += "\\midrule\n"
 
     # Add the data
-    # sort rows by experiment name
-    sorted_experiment_names = sorted(rows.keys())
+    # sort rows by experiment number
+    sorted_experiment_names = sorted(rows.keys(), key=lambda x: int(x.split("_")[-1]))
     for experiment_name in sorted_experiment_names:
         experiment_data = rows[experiment_name]
         table += f"\\textbf{{{format_name(experiment_name)}}} "
@@ -213,14 +219,56 @@ def make_table(
     return table
 
 
+def make_csv_table(
+    rows: dict[str, dict[str, dict[str, list[float]]]],
+    metrics: list[str],
+) -> str:
+    """
+    Constructs a table from the rows and model_identifier_to_name dictionaries.
+    The table is a multi-hierarchical table in csv.
+    """
+    first_row = next(iter(rows.values()))
+    model_names = sorted(list(first_row.keys()))
+
+    table = "Experiment, "
+    for model_name in model_names:
+        table += f"{model_name}, "
+    table = table[:-2] + "\n"
+
+    # Add the data
+    # sort rows by experiment name
+    sorted_experiment_names = sorted(rows.keys(), key=lambda x: int(x.split("_")[-1]))
+    for experiment_name in sorted_experiment_names:
+        experiment_data = rows[experiment_name]
+        table += f"{format_name(experiment_name)}, "
+
+        for model_name in model_names:
+            for metric in metrics:
+                metric_mean = np.mean(experiment_data[model_name][metric])
+                metric_std = np.std(experiment_data[model_name][metric]) / np.sqrt(len(experiment_data[model_name][metric]))
+                table += f"{metric_mean:.2f} +-  {metric_std:.2f}, "
+        table = table[:-2] + "\n"
+
+    return table
+
 
 def main():
     args = parse_args()
     data = get_data(args.job_dir)
     rows = make_dicts_for_table(data)
+    os.makedirs(args.out_dir, exist_ok=True)
     for metric in METRICS:
-        table = make_table(rows, [metric])
-        print(table)
+        table_latex = make_latex_table(rows, [metric])
+        table_csv = make_csv_table(rows, [metric])
+
+        # Save the tables
+        with open(os.path.join(args.out_dir, f"{metric}_table.tex"), "w") as f:
+            f.write(table_latex)
+
+        with open(os.path.join(args.out_dir, f"{metric}_table.csv"), "w") as f:
+            f.write(table_csv)
+
+
 
 
 if __name__ == "__main__":

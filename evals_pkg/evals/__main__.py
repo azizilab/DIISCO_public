@@ -284,6 +284,11 @@ def main():
         flip_prob_inactive=args.flip_prob_inactive,
         threshold_for_active=args.threshold,
         seed=args.seed,
+        # Dataset stuff
+        weights=dataset.weights.tolist(),
+        standardized_observations=dataset.standardized_observations.tolist(),
+        observations=dataset.observations.tolist(),
+        timepoints=dataset.timepoints.tolist(),
         # Stuff pertaining the model itself
         model_name=args.model,
         config=config,
