@@ -25,8 +25,8 @@ class DiiscoModel(Model):
 
     def __init__(
         self,
-        w_length_scale: float = 3.0,
-        w_length_scale_range: float = 1.0,
+        w_length_scale: float = 1.0,
+        w_length_scale_range: float = 0.2,
         w_variance: float = 3.0,
         y_length_scale: float = 3,
         y_variance: float = 3.0,
@@ -97,9 +97,9 @@ class DiiscoModel(Model):
         self.w_variance = w_variance
         # We can set this value to be very small because the
         # snr should be very high
-        self.w_sigma = w_variance / 20
+        self.w_sigma = w_variance / 100
         self.y_sigma = y_sigma
-        self.f_sigma = y_sigma
+        self.f_sigma = y_sigma / 1
         self.f_length_scale = y_length_scale
         self.f_variance = y_variance  # (f and y are the same essentially)
 

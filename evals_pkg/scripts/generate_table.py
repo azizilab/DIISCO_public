@@ -22,6 +22,8 @@ METRICS = [
     "F1",
     "Prec",
     "Rec",
+    "PR AUC",
+    "R2"
 ]
 
 # Some functions that take the metric
@@ -29,10 +31,13 @@ METRICS = [
 # from the RunResults object
 extract_funcs = {
     "AUC": lambda run: run.symmetrical_auc,
+    "PR AUC": lambda run: run.symmetrical_prc_auc,
     # get the one with best f1 score
     "F1": lambda run: run.f1_scores[np.argmax(run.f1_scores)],
     "Prec": lambda run: run.precisions[np.argmax(run.f1_scores)],
     "Rec": lambda run: run.recalls[np.argmax(run.f1_scores)],
+    "R2": lambda run: run.r2
+
 }
 
 METRIC_TO_CAPTION = {
@@ -40,6 +45,8 @@ METRIC_TO_CAPTION = {
     "F1": "F1 Score",
     "Prec": "Precision",
     "Rec": "Recall",
+    "PR AUC": "Average Precision",
+    "R2": "R2 Score"
 }
 
 

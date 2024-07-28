@@ -19,7 +19,7 @@ from evals.metrics import (
     evaluate_predicted_observations,
     ObservationMetrics,
 )
-from evals.models import DiiscoModel
+from evals.models import DiiscoModel, RollingLinearModel
 
 import os
 import namesgenerator
@@ -177,7 +177,11 @@ def make_model_config(model_cls: Model, args: argparse.Namespace) -> dict:
         config["y_length_scale"] = args.length_scale
 
         assert "y_sigma" in config
-        config["y_sigma"] = args.noise /2
+        config["y_sigma"] = args.noise * 1.5
+
+    if model_cls == RollingLinearModel:
+        assert "epsilon" in config
+        config["epsilon"] = args.weights_length_scale
 
     # Add additional model parameters
     if args.model_parameters is not None:
@@ -227,20 +231,20 @@ def main():
     model = model_cls(**config)
 
     model.fit(
-        t=dataset.timepoints, y=dataset.observations, is_active=dataset.model_prior
+        t=dataset.timepoints, y=dataset.standardized_observations, is_active=dataset.model_prior
     )
 
     interaction_score = model.predict_obs_interactions()
     interaction_metrics: InteractionMetrics = evaluate_predicted_interactions(
         true_interactions=dataset.true_interactions,
         interaction_score=interaction_score,
-        observations=dataset.observations,
+        observations=dataset.standardized_observations,
         timepoints=dataset.timepoints,
     )
     # print("\n\ninteraction_score", interaction_score.astype(int)[0])
     # print("\n\ntrue_interactions", dataset.true_interactions.astype(int)[0])
 
-    true_observations = dataset.observations
+    true_observations = dataset.standardized_observations
     predicted_observations = model.predict_y_train()
 
     # print("\n\ntrue_observations", true_observations)
@@ -260,6 +264,7 @@ def main():
         mse=observation_metrics.mse,
         rmse=observation_metrics.rmse,
         mae=observation_metrics.mae,
+
         # Metrics pertaining the interactions
         stds=interaction_metrics.stds,
         accuracies=interaction_metrics.accuracies,
@@ -273,6 +278,11 @@ def main():
         true_interactions=interaction_metrics.true_interactions,
         transformed_interactions=interaction_metrics.transformed_interactions,
         symmetrical_transformed_interactions=interaction_metrics.symmetrical_transformed_interactions,
+
+        # Predicted
+        predicted_interactions=interaction_score.tolist(),
+        predicted_observations=predicted_observations.tolist(),
+
         # Metrics pertaining the dataset
         n_cells=dataset.observations.shape[1],
         n_timepoints=dataset.observations.shape[0],
@@ -284,6 +294,7 @@ def main():
         flip_prob_inactive=args.flip_prob_inactive,
         threshold_for_active=args.threshold,
         seed=args.seed,
+
         # Dataset stuff
         weights=dataset.weights.tolist(),
         standardized_observations=dataset.standardized_observations.tolist(),

@@ -20,7 +20,7 @@ from matplotlib import pyplot as plt
 import re
 
 
-Y_TO_PLOT_PER_SCENARIO = 3
+Y_TO_PLOT_PER_SCENARIO = 4
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -89,30 +89,46 @@ def plot_and_save_datasets(
     Each dataset has Y_TO_PLOT_PER_SCENARIO cells plotted.
     The cells are randomly selected for each scenario.
     """
-
+    cell_colors = ["red", "blue", "green", "orange", "purple", "brown", "pink", "gray", "olive", "cyan"]
     for data_name, experiment_data in data.items():
         np.random.seed(0)
 
         standardized_observations = experiment_data[0].standardized_observations
         timepoints = np.array(experiment_data[0].timepoints)
+        seed = experiment_data[0].seed
 
         standardized_observations = np.array(standardized_observations)
         n_timepoints, n_cells = len(timepoints), len(standardized_observations[0])
-
-
         cell_selection = np.random.choice(n_cells, Y_TO_PLOT_PER_SCENARIO, replace=False)
+
         fig, ax = plt.subplots(figsize=(10, 10))
         sorted_timepoints = np.argsort(timepoints)
         timepoints = timepoints[sorted_timepoints]
-        for cell in cell_selection:
 
-
+        # First plot the standardized observations
+        for i, cell in enumerate(cell_selection):
+            cell_color = cell_colors[i]
             cells = standardized_observations[sorted_timepoints, cell]
-            ax.scatter(timepoints, cells, label=f"Cell {cell}")
-            ax.plot(timepoints, cells)
+            ax.scatter(timepoints, cells, label=f"Cell {cell}", color=cell_color)
+
+        # Now plot the predictions for the same cells
+        for run in experiment_data:
+            model_name = make_model_name(run)
+
+            if "Diisco"  not in model_name:
+                continue
+            if run.seed != seed:
+                continue
+
+            predictions = np.array(run.predicted_observations)
+            predictions = predictions[sorted_timepoints]
+            for i, cell in enumerate(cell_selection):
+                cell_color = cell_colors[i]
+                ax.scatter(timepoints, predictions[:, cell], label=f"{model_name} Cell {cell}", color=cell_color, marker="x")
 
 
-
+        # Add the legend
+        ax.legend()
 
         ax.set_title(f"Standardized Observations for {data_name}")
         os.makedirs(output_path, exist_ok=True)

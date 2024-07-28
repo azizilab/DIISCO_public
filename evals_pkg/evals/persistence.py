@@ -32,6 +32,8 @@ class RunResults:
     true_interactions: list[int]
     transformed_interactions: list[int]
     symmetrical_transformed_interactions: list[int]
+    predicted_interactions: list[list[list[float]]]  # n_timepoints x n_cells x n_cells
+    predicted_observations: list[list[float]]  # n_timepoints x n_cells
 
     # Metrics pertaining the dataset
     n_cells: int

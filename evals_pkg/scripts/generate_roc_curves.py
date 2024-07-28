@@ -109,38 +109,41 @@ def make_prec_rec_curves(
             model_name = make_model_name(run)
             true_interactions = run.true_interactions
             symmetrical_transformed_interactions = run.symmetrical_transformed_interactions
-            prec, rec, _ = precision_recall_curve(true_interactions, symmetrical_transformed_interactions)
-            print(prec, rec)
+            fpr, tpr, _ = roc_curve(true_interactions, symmetrical_transformed_interactions)
 
             if model_name not in model_dict:
-                model_dict[model_name] = [(prec, rec)]
+                model_dict[model_name] = [(fpr, tpr)]
             else:
-                model_dict[model_name].append((prec, rec))
+                model_dict[model_name].append((fpr, tpr))
 
 
         # The fpr is different per seed,
         # So first we create a single big fpr per model
         # Then extrapolate the tpr for each fpr
         # Then we average the tpr for each fpr
-        for model_name, prec_rec_list in model_dict.items():
-            collective_prec = np.concatenate([prec for prec, _ in prec_rec_list])
-            collective_prec = sorted(set(collective_prec))
+        for model_name, fpr_tpr_list in model_dict.items():
+            collective_fpr = np.linspace(0, 1, 1000)
 
 
             # extrapolate tpr for each fpr
-            collective_rec = []
-            for prec, rec in prec_rec_list:
-                collective_rec.append(np.interp(collective_prec, prec, rec))
+            collective_tpr = []
+            for fpr, tpr in fpr_tpr_list:
+
+                assert np.all(np.diff(fpr) >= 0)
+                indices = np.searchsorted(fpr, collective_fpr)
+                indices = np.clip(indices, 0, len(fpr) - 1)
+                collective_tpr.append(tpr[indices])
+
 
             # average tpr for each fpr
-            collective_rec = np.mean(collective_rec, axis=0)
-            collective_rec_std = np.std(collective_rec, axis=0) / np.sqrt(len(prec_rec_list))
-            model_dict[model_name] = (collective_prec, collective_rec, collective_rec_std)
+            average_tpr = np.mean(collective_tpr, axis=0)
+            tpr_std = np.std(collective_tpr, axis=0) / np.sqrt(len(collective_tpr))
+            model_dict[model_name] = (collective_fpr, average_tpr, tpr_std)
 
         rows[experiment_name] = model_dict
     return rows
 
-def plot_and_save_prec_rec_curves(
+def plot_and_save_roc_curves(
     rows: dict[str, dict[str, (list[float], list[float])]],
     output_path: str,
     ):
@@ -154,8 +157,8 @@ def plot_and_save_prec_rec_curves(
         fig, ax = plt.subplots()
         for mi, model_name in enumerate(sorted_model_names):
             if model_name in experiment_data:
-                prec, rec_mean, tpr_std = experiment_data[model_name]
-                ax.plot(prec, rec_mean, label=model_name, color=colors(mi))
+                fpr, tpr_mean, tpr_std = experiment_data[model_name]
+                ax.plot(fpr,tpr_mean, label=model_name, color=colors(mi))
                 #ax.fill_between(fpr, tpr_mean - tpr_std, tpr_mean + tpr_std, color=colors(mi), alpha=0.3)
         ax.set_xlabel("Precision")
         ax.set_ylabel("Recall")
@@ -171,7 +174,7 @@ def main():
     args = parse_args()
     data = get_data(args.job_dir)
     rows = make_prec_rec_curves(data)
-    plot_and_save_prec_rec_curves(rows, args.out_dir)
+    plot_and_save_roc_curves(rows, args.out_dir)
 
 
 
