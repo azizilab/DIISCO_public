@@ -207,7 +207,7 @@ def create_model_prior_from_true_interactions(
         if np.all(model_prior[cell] == 0):
             model_prior[cell, np.random.randint(0, total_cells)] = 1
 
-    print("\n\nmodel_prior cmi\n\n", model_prior)
+    # print("\n\nmodel_prior cmi\n\n", model_prior)
     return model_prior
 
 
@@ -237,7 +237,7 @@ def create_true_interactions_from_dependent_computations(
             true_interactions[t, i, i] = 1 if and only if weights[t, i, i] = 1.
         This ensure that the independent values get  counted adequately.
     """
-    print("\n\nweights cti\n\n", weights[0])
+    # print("\n\nweights cti\n\n", weights[0])
     n_timepoints, total_cells, _ = weights.shape
     reachability_matrix = np.zeros((n_timepoints, total_cells, total_cells))
 
@@ -263,7 +263,7 @@ def create_true_interactions_from_dependent_computations(
         :, np.arange(total_cells), np.arange(total_cells)
     ] = original_diagonals
 
-    print("\n\ntrue_interactions cti\n\n", true_interactions[0])
+    # print("\n\ntrue_interactions cti\n\n", true_interactions[0])
     return true_interactions
 
 
