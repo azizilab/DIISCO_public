@@ -243,25 +243,20 @@ def create_true_interactions_from_dependent_computations(
 
     is_active_matrix = np.abs(weights) > threshold
     # Ensure symmetry
+    # adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
+    is_active_matrix = is_active_matrix.astype(int)
     adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
+    # Ensure symmetry
 
+    # making diagonal 0, removing reachability
     for t in range(n_timepoints):
         # Make sure diagonal is 1 for computation
-        adjacency_matrix[t] = np.maximum(adjacency_matrix[t], np.eye(total_cells))
-        reachability_matrix[t] = compute_reachability_matrix(adjacency_matrix[t])
+        # adjacency_matrix[t] = np.maximum(adjacency_matrix[t], np.eye(total_cells))
+        # reachability_matrix[t] = compute_reachability_matrix(adjacency_matrix[t])
         # But also ensure it is 0 for the final result
-        reachability_matrix[t] = np.minimum(
-            reachability_matrix[t], 1 - np.eye(total_cells)
-        )
-
-    # set the diagonal to 0
-    true_interactions = reachability_matrix
-    original_diagonals = is_active_matrix[
-        :, np.arange(total_cells), np.arange(total_cells)
-    ].astype(int)
-    true_interactions[
-        :, np.arange(total_cells), np.arange(total_cells)
-    ] = original_diagonals
+        np.fill_diagonal(is_active_matrix[t,:,:],0)
+    
+    true_interactions = is_active_matrix
 
     # print("\n\ntrue_interactions cti\n\n", true_interactions[0])
     return true_interactions
