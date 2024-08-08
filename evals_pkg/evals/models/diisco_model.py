@@ -294,4 +294,11 @@ class DiiscoModel(Model):
         return self._train_means
 
 
+    def get_predictions(self):
+        timepoints = torch.tensor(self._t_train, dtype=_DEFAULT_DTYPE).reshape(-1, 1)
+        predict_timepoints = torch.linspace(timepoints.min(), timepoints.max(), 100).reshape(-1, 1)
+        sample_dict = self._model.sample(predict_timepoints, n_samples=1000, include_emission_variance=True)
+        
+        return sample_dict,predict_timepoints
+
 

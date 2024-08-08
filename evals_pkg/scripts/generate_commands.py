@@ -21,11 +21,11 @@ LOW_MISPECIFICATION_FLIP_PROB_INACTIVE = 0.1
 HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE = 0.5
 
 # Number of time pointsand blocks
-N_TIMEPOINTS_SMALL = 12
-N_TIMEPOINTS_LARGE = 25
+N_TIMEPOINTS_SMALL = 8
+N_TIMEPOINTS_LARGE = 15
 N_BLOCKS = 2
-N_INDEPENDENT = 5
-N_DEPENDENT = 4
+N_INDEPENDENT = 3
+N_DEPENDENT = 5
 NOISE = 0.1
 
 # Dynamics constants
@@ -93,6 +93,18 @@ constant_all_scenarios = {
 
 
 scenarios = [
+#Scenario 1: cam1
+{
+   "--name": "scenario_cam1",
+   "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+   "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+   "--weights-length-scale": WEIGHTS_LENGTHSCALE_LINEAR,
+   "--length-scale": LENGTHS_SCALE_LINEAR,
+   "--p-active": LOW_CONNECTIVITY_PROB,
+   "--n-timepoints": N_TIMEPOINTS_SMALL,
+   "description": "Simple linear regression  (low misspecification- small dataset)"
+},
+    
 # Scenario 1: Simple linear regression  (low misspecification- small dataset)
 #{
 #    "--name": "scenario_1",
@@ -104,6 +116,7 @@ scenarios = [
 #    "--n-timepoints": N_TIMEPOINTS_SMALL,
 #    "description": "Simple linear regression  (low misspecification- small dataset)"
 #},
+    
 #
 #
 ## Scenario 2: Simple linear regression  (high misspecification- small dataset)
@@ -118,82 +131,82 @@ scenarios = [
 #    "description": "Simple linear regression  (high misspecification- small dataset)"
 #},
 
-# Scenario 3: Slow dynamics (low misspecification- small dataset)
-{
-    "--name": "scenario_1",
-    "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_SMALL,
-    "description": "Slow dynamics (low misspecification- small dataset)"
-},
+# # Scenario 3: Slow dynamics (low misspecification- small dataset)
+# {
+#     "--name": "scenario_1",
+#     "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_SMALL,
+#     "description": "Slow dynamics (low misspecification- small dataset)"
+# },
 
 
-# Scenario 4: Slow dynamics (high misspecification- small dataset)
-{
-    "--name": "scenario_2",
-    "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_SMALL,
-    "description": "Slow dynamics (high misspecification- small dataset)"
-},
+# # Scenario 4: Slow dynamics (high misspecification- small dataset)
+# {
+#     "--name": "scenario_2",
+#     "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_SMALL,
+#     "description": "Slow dynamics (high misspecification- small dataset)"
+# },
 
 
-# Scenario 5: Fast dynamics (low misspecification- small dataset)
-{
-    "--name": "scenario_3",
-    "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
-    "--length-scale": LENGTHS_SCALE_FAST,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_SMALL,
-    "description": "Fast dynamics (low misspecification- small dataset)"
-},
+# # Scenario 5: Fast dynamics (low misspecification- small dataset)
+# {
+#     "--name": "scenario_3",
+#     "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
+#     "--length-scale": LENGTHS_SCALE_FAST,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_SMALL,
+#     "description": "Fast dynamics (low misspecification- small dataset)"
+# },
 
 
-# Scenario 6: Fast dynamics (high misspecification- small dataset)
-{
-    "--name": "scenario_4",
-    "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
-    "--length-scale": LENGTHS_SCALE_FAST,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_SMALL,
-    "description": "Fast dynamics (high misspecification- small dataset)"
-},
+# # Scenario 6: Fast dynamics (high misspecification- small dataset)
+# {
+#     "--name": "scenario_4",
+#     "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
+#     "--length-scale": LENGTHS_SCALE_FAST,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_SMALL,
+#     "description": "Fast dynamics (high misspecification- small dataset)"
+# },
 
 
-# Scenario 7: High-connectivity (low misspecification- small dataset)
-{
-    "--name": "scenario_5",
-    "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": HIGH_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_SMALL,
-    "description": "High-connectivity (low misspecification- small dataset)"
-},
+# # Scenario 7: High-connectivity (low misspecification- small dataset)
+# {
+#     "--name": "scenario_5",
+#     "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": HIGH_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_SMALL,
+#     "description": "High-connectivity (low misspecification- small dataset)"
+# },
 
 
-# Scenario 8: High-connectivity (high misspecification- small dataset)
-{
-    "--name": "scenario_6",
-    "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": HIGH_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_SMALL,
-    "description": "High-connectivity (high misspecification- small dataset)"
-},
+# # Scenario 8: High-connectivity (high misspecification- small dataset)
+# {
+#     "--name": "scenario_6",
+#     "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": HIGH_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_SMALL,
+#     "description": "High-connectivity (high misspecification- small dataset)"
+# },
 
 ## Scenario 9: Simple linear regression  (low misspecification- large dataset)
 #{
@@ -220,84 +233,84 @@ scenarios = [
 #    "description": "Simple linear regression  (high misspecification- large dataset)"
 #},
 
-# Scenario 11: Slow dynamics (low misspecification- large dataset)
-{
-    "--name": "scenario_7",
-    "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_LARGE,
-    "description": "Slow dynamics (low misspecification- large dataset)"
-},
+# # Scenario 11: Slow dynamics (low misspecification- large dataset)
+# {
+#     "--name": "scenario_7",
+#     "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_LARGE,
+#     "description": "Slow dynamics (low misspecification- large dataset)"
+# },
 
 
-# Scenario 12: Slow dynamics (high misspecification- large dataset)
-{
-    "--name": "scenario_8",
-    "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_LARGE,
-    "description": "Slow dynamics (high misspecification- large dataset)"
-},
+# # Scenario 12: Slow dynamics (high misspecification- large dataset)
+# {
+#     "--name": "scenario_8",
+#     "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_LARGE,
+#     "description": "Slow dynamics (high misspecification- large dataset)"
+# },
 
 
-# Scenario 13: Fast dynamics (low misspecification- large dataset)
-{
-    "--name": "scenario_9",
-    "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
-    "--length-scale": LENGTHS_SCALE_FAST,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_LARGE,
-    "description": "Fast dynamics (low misspecification- large dataset)"
-},
+# # Scenario 13: Fast dynamics (low misspecification- large dataset)
+# {
+#     "--name": "scenario_9",
+#     "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
+#     "--length-scale": LENGTHS_SCALE_FAST,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_LARGE,
+#     "description": "Fast dynamics (low misspecification- large dataset)"
+# },
 
 
 # Scenario 14: Fast dynamics (high misspecification- large dataset)
-{
-    "--name": "scenario_10",
-    "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
-    "--length-scale": LENGTHS_SCALE_FAST,
-    "--p-active": LOW_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_LARGE,
-    "description": "Fast dynamics (high misspecification- large dataset)"
-},
+# {
+#     "--name": "scenario_10",
+#     "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_FAST,
+#     "--length-scale": LENGTHS_SCALE_FAST,
+#     "--p-active": LOW_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_LARGE,
+#     "description": "Fast dynamics (high misspecification- large dataset)"
+# },
 
 
 # Scenario 15: High-connectivity (low misspecification- large dataset)
-{
-    "--name": "scenario_11",
-    "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": HIGH_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_LARGE,
-    "description": "High-connectivity (low misspecification- large dataset)"
+# {
+#     "--name": "scenario_11",
+#     "--flip-prob-active": LOW_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": LOW_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": HIGH_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_LARGE,
+#     "description": "High-connectivity (low misspecification- large dataset)"
 
-},
+# },
 
 
 # Scenario 16: High-connectivity (high misspecification- large dataset)
-{
-    "--name": "scenario_12",
-    "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
-    "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
-    "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
-    "--length-scale": LENGTHS_SCALE_SLOW,
-    "--p-active": HIGH_CONNECTIVITY_PROB,
-    "--n-timepoints": N_TIMEPOINTS_LARGE,
-    "description": "High-connectivity (high misspecification- large dataset)"
-},
-]
+# {
+#     "--name": "scenario_12",
+#     "--flip-prob-active": HIGH_MISPECIFICATION_FLIP_PROB_ACTIVE,
+#     "--flip-prob-inactive": HIGH_MISPECIFICATION_FLIP_PROB_INACTIVE,
+#     "--weights-length-scale": WEIGHTS_LENGTHSCALE_SLOW,
+#     "--length-scale": LENGTHS_SCALE_SLOW,
+#     "--p-active": HIGH_CONNECTIVITY_PROB,
+#     "--n-timepoints": N_TIMEPOINTS_LARGE,
+#     "description": "High-connectivity (high misspecification- large dataset)"
+# },
+# ]
 
 def generate_latex_table_from_df(df: pd.DataFrame, caption: str = "Model Performance: AUC") -> str:
     table = "\\begin{table}[!h]\n"
