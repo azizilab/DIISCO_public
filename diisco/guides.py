@@ -528,8 +528,8 @@ class DiagonalNormal(Guide):
 
         # TODO: We are not using linear regression to initialize the
         # parameters of the guide. We should remove the code here then.
-        init_W = torch.randn(n_cell_types, n_cell_types, n_timepoints) * 0.1
-        init_B = torch.randn(n_cell_types, 1, n_timepoints) * 0.1
+        # init_W = torch.randn(n_cell_types, n_cell_types, n_timepoints) * 0.1
+        # init_B = torch.randn(n_cell_types, 1, n_timepoints) * 0.1
 
         return init_W, init_B
 

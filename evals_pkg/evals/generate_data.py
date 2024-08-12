@@ -157,7 +157,7 @@ def generate_data(
                     observations[timepoint, independent_block],
                 )
                 observations[timepoint, cell] = w @ obs + np.random.normal(0, noise*10)
-
+    
     # Standardized observed
     standardized_observations = (observations - np.mean(observations, axis=0)) / np.std(
         observations, axis=0
@@ -170,7 +170,6 @@ def generate_data(
         standardized_observations[:, extra_cell] = observations[:, extra_cell]
         weights[:, extra_cell] = 0
         weights[:, extra_cell, extra_cell] = 1
-
     
     true_interactions = create_true_interactions_from_dependent_computations(
         weights, threshold_for_active
@@ -266,7 +265,7 @@ def create_true_interactions_from_dependent_computations(
 
     is_active_matrix = np.abs(weights) > threshold
     # Ensure symmetry
-    adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
+    # adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
 
     # for t in range(n_timepoints):
     #     # Make sure diagonal is 1 for computation
@@ -278,7 +277,7 @@ def create_true_interactions_from_dependent_computations(
     #     )
 
     # set the diagonal to 0
-    true_interactions = adjacency_matrix
+    true_interactions = is_active_matrix # test withotu the symmetry
     original_diagonals = is_active_matrix[
         :, np.arange(total_cells), np.arange(total_cells)
     ].astype(int)

@@ -19,6 +19,8 @@ class RunResults:
     # Metrics pertaining the interactions
     # All the lists have the same length and correspond to using a
     # threshold of that length
+    r2_W: list[float]
+    rmse_W: list[float]
     stds: list[float]
     accuracies: list[float]
     precisions: list[float]
