@@ -8,7 +8,7 @@ DIISCO
 
 A probabilistic programming method to characterize dynamic cellular interactions in longitudinal scRNA-seq data.
 
-Bioarxiv pre-print: https://www.biorxiv.org/content/10.1101/2023.11.14.566956v1
+Genome Research Publication: https://genome.cshlp.org/content/early/2024/09/04/gr.279126.124.abstract
 
 Repository currently under refactor!
 
