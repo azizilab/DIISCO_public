@@ -1,28 +1,45 @@
 """
-Contains functions for generating data for DIISCO
+Contains functions for generating data for DIISCO and other related functions.
+
+The main function to look at in this file is the generate_data function and the `SampledData`
+class.
 """
-import numpy as np
-import pandas as pd
-
-import numpy as np
-
 import numpy as np
 from jaxtyping import Float
 from dataclasses import dataclass
 
+
 @dataclass
 class SampledData:
     # The latent weights matrix
-    weights_matrix: Float[np.ndarray, "n_timepoints total_cells total_cells"]
-    # Whether an edge is active or not should be the same across all timepoints
-    is_active_matrix: Float[np.ndarray, "n_timepoints total_cells total_cells"]
+    weights: Float[np.ndarray, "n_timepoints total_cells total_cells"]
     # The actual matrix with observed values
-    observed_matrix: Float[np.ndarray, "n_timepoints total_cells"]
+    observations: Float[np.ndarray, "n_timepoints total_cells"]
+    # Standardized observed matrix
+    standardized_observations: Float[np.ndarray, "n_timepoints total_cells"]
+    # True interactions: By convention the diagonals are always 0 and the matrix is symmetric
+    true_interactions: Float[np.ndarray, "n_timepoints total_cells total_cells"]
+    # The prior matrix to be used for the model. This is a noisier version of the true interactions
+    # should have the diagonal equal to 1 if the cell has no other interactions.
+    model_prior: Float[np.ndarray, "total_cells total_cells"]
     # The timepoints at which the data was sampled. This should be uniform
-    timepoints: Float[np.ndarray, "n_timepoints"]
+    timepoints: Float[np.ndarray, " n_timepoints"]
 
 
-def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_dependent_per_block : int = 10, n_timepoints : int = 100, noise : float = 0.1, length_scale : float = 1, seed : int = 0, p_active : float = 0.1) -> SampledData:
+def generate_data(
+    n_blocks: int = 30,
+    n_independent_per_block: int = 10,
+    n_dependent_per_block: int = 10,
+    n_timepoints: int = 100,
+    noise: float = 0.1,
+    length_scale: float = 1,
+    weights_length_scale: float = 3,
+    seed: int = 0,
+    p_active: float = 0.1,
+    flip_prob_active: float = 0.1,
+    flip_prob_inactive: float = 0.1,
+    threshold_for_active: float = 0.1,
+) -> SampledData:
     """
     Generates data for DIISCO
 
@@ -47,77 +64,235 @@ def generate_data(n_blocks : int = 30, n_indepenent_per_block : int = 10, n_depe
         The noise in the data
     length_scale : float
         The length scale of the gaussian process
+    p_active : float
+        The probability that a dependent variable depends on an independent variable.
+        Always each dependent variable depends on at least one independent variable
+    flip_prob_active : float
+        The probability of flipping an active edge in the model prior
+    flip_prob_inactive : float
+        The probability of flipping an inactive edge in the model prior
+    threshold_for_active : float
+        How big should the absolute value of the weight be for the edge to be considered active.
 
-    Returns SampledData
+    Returns
     ------------------------
-    weights_matrix : np.ndarray
-        The weights matrix of shape (n_timepoints, total_cells, total_cells)
-    is_active_matrix : np.ndarray
-        The is_active_matrix containing 1 if the edge is active, 0 otherwise
-        of shape (n_timepoints, total_cells, total
-    observed_matrix : np.ndarray
-        The observed_matrix containing the observed values of the cells
-        of shape (n_timepoints, total_cells)
-    timepoints : np.ndarray
-        The timepoints of the data of shape (n_timepoints,)
+    SampledData :
+        A dataclass containing dataa for training a checking a model
+        satisfying the assumptions of DIISCO.
     """
     np.random.seed(seed)
 
-    weights_length_scale = length_scale * 3
-    block_size = n_indepenent_per_block + n_dependent_per_block
+    block_size = n_independent_per_block + n_dependent_per_block
     total_cells = n_blocks * block_size
-    weights_matrix = np.zeros((n_timepoints, total_cells, total_cells))
 
-    is_active_matrix = np.zeros((n_timepoints, total_cells, total_cells)) # 1 if the edge is active, 0 otherwise
-    observed_matrix = np.zeros((n_timepoints, total_cells)) # 1 if the cell is observed, 0 otherwise
+    weights = np.zeros((n_timepoints, total_cells, total_cells))
+    # m[t, i, j] = 1 if i is computed from j at time t
+    observations = np.zeros((n_timepoints, total_cells))
 
     timepoints = np.linspace(0, 1, n_timepoints)
 
     # Fill in the weights matrix
     for i in range(total_cells):
         for j in range(total_cells):
-            if i == j:
-                weights_matrix[:, i, j] = 1
-            else:
-                weights_matrix[:, i, j] = _sample_from_gp(timepoints, weights_length_scale, noise).flatten()
+            weights[:, i, j] = _sample_from_gp(
+                timepoints, weights_length_scale, noise
+            ).flatten()
 
     # Lets pretend that they all independent variables at the start
     for cell in range(total_cells):
-        observed_matrix[:, cell] = _sample_from_gp(timepoints, length_scale, noise).flatten()
+        observations[:, cell] = _sample_from_gp(
+            timepoints, length_scale, noise
+        ).flatten()
 
-    # Now we repace the dependent variables with the independent variables
+    # Now we repace the dependent variables with actual values
     for block in range(n_blocks):
-        independent_block = np.arange(block * block_size, block * block_size + n_indepenent_per_block)
-        dependent_block = np.arange(block * block_size + n_indepenent_per_block, block * block_size + block_size)
+        independent_block = np.arange(
+            block * block_size, block * block_size + n_independent_per_block
+        )
+        dependent_block = np.arange(
+            block * block_size + n_independent_per_block,
+            block * block_size + block_size,
+        )
+        other_blocks = np.setdiff1d(
+            np.arange(total_cells), np.concatenate([independent_block, dependent_block])
+        )
+
+        for cell in independent_block:
+            observations[:, cell] = _sample_from_gp(
+                timepoints, length_scale, noise
+            ).flatten()
+            weights[:, cell] = 0
+            weights[:, cell, cell] = 1
 
         for cell in dependent_block:
-            active_independent_cells_mask = np.random.rand(n_indepenent_per_block) < p_active
+            active_independent_cells_mask = (
+                np.random.rand(n_independent_per_block) < p_active
+            )
+            if not np.any(active_independent_cells_mask):
+                active_independent_cells_mask[
+                    np.random.randint(0, n_independent_per_block)
+                ] = True
+
             for timepoint in range(n_timepoints):
-                actual_observed_matrix = observed_matrix[timepoint, independent_block] * active_independent_cells_mask
-                observed_matrix[timepoint, cell] = weights_matrix[timepoint, cell, independent_block] @ actual_observed_matrix + np.random.normal(0, noise)
-                is_active_matrix[timepoint, cell, independent_block] = active_independent_cells_mask
+                weights[timepoint, cell, independent_block] = weights[
+                    timepoint, cell, independent_block
+                ] * active_independent_cells_mask.astype(int)
+                weights[timepoint, cell, other_blocks] = 0
+                weights[timepoint, cell, dependent_block] = 0
+                w, obs = (
+                    weights[timepoint, cell, independent_block],
+                    observations[timepoint, independent_block],
+                )
+                observations[timepoint, cell] = w @ obs + np.random.normal(0, noise)
 
+    # Standardized observed
+    standardized_observations = (observations - np.mean(observations, axis=0)) / np.std(
+        observations, axis=0
+    )
+    true_interactions = create_true_interactions_from_dependent_computations(
+        weights, threshold_for_active
+    )
+    model_prior = create_model_prior_from_true_interactions(
+        true_interactions, flip_prob_active, flip_prob_inactive
+    )
 
-    # Set diagonals to 1 in is_active and weights matrix
-    for i in range(total_cells):
-        for j in range(total_cells):
-            if i == j:
-                is_active_matrix[:, i, j] = 1
-
-    # Zero out the values of W that are not active
-    weights_matrix = weights_matrix * is_active_matrix
-
-    assert weights_matrix.shape == (n_timepoints, total_cells, total_cells)
-    assert is_active_matrix.shape == (n_timepoints, total_cells, total_cells)
-    assert observed_matrix.shape == (n_timepoints, total_cells)
+    assert weights.shape == (n_timepoints, total_cells, total_cells)
+    assert observations.shape == (n_timepoints, total_cells)
     assert timepoints.shape == (n_timepoints,)
 
-    return SampledData(weights_matrix, is_active_matrix, observed_matrix, timepoints)
+    return SampledData(
+        weights=weights,
+        observations=observations,
+        standardized_observations=standardized_observations,
+        true_interactions=true_interactions,
+        model_prior=model_prior,
+        timepoints=timepoints,
+    )
 
 
+def create_model_prior_from_true_interactions(
+    true_interactions: Float[np.ndarray, "n_timepoints total_cells total_cells"],
+    flip_prob_active: float = 0.1,
+    flip_prob_inactive: float = 0.1,
+    seed: int = 0,
+) -> Float[np.ndarray, "total_cells total_cells"]:
+    """
+    It creates a model prior from the true interactions.
+    The model prior has the following characteristics:
+        - We have only one prior for all timepoints.
+        - The correct model prior contains 1 if at any timepoint the edge is active
+        - Any cell that has no other interactions has a 1 in the diagonal
+        - It is a noiser version of the true interactions matrix
+        - The probability of flipping an active edge is flip_prob_active
+        - The probability of flipping an inactive edge is flip_prob_inactive
+    """
+    np.random.seed(seed)
+
+    _, total_cells, _ = true_interactions.shape
+    model_prior = np.zeros((total_cells, total_cells))
+
+    for i in range(total_cells):
+        for j in range(total_cells):
+            # Check if the edge is active at any timepoint
+            is_active = np.any(true_interactions[:, i, j] == 1)
+            model_prior[i, j] = is_active
+
+            flip_prob = flip_prob_active if is_active else flip_prob_inactive
+            should_flip = np.random.rand() < flip_prob
+            if should_flip:
+                model_prior[i, j] = 1 - model_prior[i, j]
+
+    # If a cell has no interaction randomly assing one
+    for cell in range(total_cells):
+        if np.all(model_prior[cell] == 0):
+            model_prior[cell, np.random.randint(0, total_cells)] = 1
+
+    # print("\n\nmodel_prior cmi\n\n", model_prior)
+    return model_prior
 
 
-def _sample_from_gp(x: Float[np.ndarray, "n_examples 1"], lengthscale: float, noise: float) -> Float[np.ndarray, "n_examples 1"]:
+def create_true_interactions_from_dependent_computations(
+    weights: Float[np.ndarray, "n_timepoints total_cells total_cells"],
+    threshold: float = 0.1,
+) -> Float[np.ndarray, "n_timepoints total_cells total_cells"]:
+    """
+    Parameters
+    ----------
+    weights : np.ndarray
+        The weights matrix of shape (n_timepoints, total_cells, total_cells)
+    threshold : float
+        The threshold to consider an edge active or not
+
+    Returns
+    -------
+    true_interactions:
+        The is_active_matrix containing 1 if the edge is active, 0 otherwise
+        of shape (n_timepoints, total_cells, total_cells). In particular,
+        this matrix is symmetric the diagonal is 0. We say that
+        is_active[t, i, j] = 1 if j if it is possible to find a set of
+        cells j -> j_1 -> j_2 -> ... -> i where either j_k -> j_{k+1} is active
+        or j_{k+1} -> j_k is active. An edge is active if the absolute value
+        of the weight is greater than the threshold.In other words we check if they
+        are reachable. By convention
+            true_interactions[t, i, i] = 1 if and only if weights[t, i, i] = 1.
+        This ensure that the independent values get  counted adequately.
+    """
+    # print("\n\nweights cti\n\n", weights[0])
+    n_timepoints, total_cells, _ = weights.shape
+    reachability_matrix = np.zeros((n_timepoints, total_cells, total_cells))
+
+    is_active_matrix = np.abs(weights) > threshold
+    # Ensure symmetry
+    adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
+
+    for t in range(n_timepoints):
+        # Make sure diagonal is 1 for computation
+        adjacency_matrix[t] = np.maximum(adjacency_matrix[t], np.eye(total_cells))
+        reachability_matrix[t] = compute_reachability_matrix(adjacency_matrix[t])
+        # But also ensure it is 0 for the final result
+        reachability_matrix[t] = np.minimum(
+            reachability_matrix[t], 1 - np.eye(total_cells)
+        )
+
+    # set the diagonal to 0
+    true_interactions = reachability_matrix
+    original_diagonals = is_active_matrix[
+        :, np.arange(total_cells), np.arange(total_cells)
+    ].astype(int)
+    true_interactions[
+        :, np.arange(total_cells), np.arange(total_cells)
+    ] = original_diagonals
+
+    # print("\n\ntrue_interactions cti\n\n", true_interactions[0])
+    return true_interactions
+
+
+def compute_reachability_matrix(
+    adj_matrix: Float[np.ndarray, "n_cells n_cells"]
+) -> Float[np.ndarray, "n_cells n_cells"]:
+    """
+    Compute the reachability matrix of a graph using matrix exponentiation.
+
+    Parameters
+    ----------
+    adj_matrix : np.ndarray
+        The adjacency matrix of the graph.
+        Should be a square matrix of shape (n_cells, n_cells) with a 1.0 if there is an edge
+        between the two cells and 0.0 otherwise. The diagonal be 1.0
+        because a matrix is always reachable from itself.
+
+    """
+    n = len(adj_matrix)
+    assert adj_matrix.shape == (n, n)
+    reach = np.linalg.matrix_power(np.array(adj_matrix), n)
+    reach[reach > 0] = 1  # Convert non-zero values to 1 for reachability
+
+    return reach
+
+
+def _sample_from_gp(
+    x: Float[np.ndarray, "n_examples 1"], lengthscale: float, noise: float
+) -> Float[np.ndarray, "n_examples 1"]:
     """
     Sample from a Gaussian Process with a standard Gaussian (RBF) kernel.
 
@@ -137,7 +312,9 @@ def _sample_from_gp(x: Float[np.ndarray, "n_examples 1"], lengthscale: float, no
     # Number of examples
     n_examples = x.shape[0]
 
-    def rbf_kernel(a: Float[np.ndarray, "n d"], b: Float[np.ndarray, "m d"], lengthscale: float) -> Float[np.ndarray, "n m"]:
+    def rbf_kernel(
+        a: Float[np.ndarray, "n d"], b: Float[np.ndarray, "m d"], lengthscale: float
+    ) -> Float[np.ndarray, "n m"]:
         """
         Radial Basis Function (RBF) kernel.
 
@@ -149,7 +326,9 @@ def _sample_from_gp(x: Float[np.ndarray, "n_examples 1"], lengthscale: float, no
         Returns:
         - np.ndarray : Covariance matrix of shape (n, m)
         """
-        sqdist = np.sum(a**2, 1).reshape(-1, 1) + np.sum(b**2, 1) - 2 * np.dot(a, b.T)
+        sqdist = (
+            np.sum(a**2, 1).reshape(-1, 1) + np.sum(b**2, 1) - 2 * np.dot(a, b.T)
+        )
         return np.exp(-0.5 * sqdist / lengthscale**2)
 
     # Compute the covariance matrix

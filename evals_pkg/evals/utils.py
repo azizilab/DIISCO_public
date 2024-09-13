@@ -1,5 +1,7 @@
 from jaxtyping import Float
 from numpy import ndarray
+import inspect
+
 
 def get_percentage_contributions(
     w_matrix: Float[ndarray, "n_timepoints n_cells n_cells"],
@@ -16,8 +18,10 @@ def get_percentage_contributions(
     assert w_matrix.ndim == 3
     n_timepoints, n_cells, _ = w_matrix.shape
     assert cell_obs.shape == (n_timepoints, n_cells)
-    assert independent_contributions is None or independent_contributions.shape == (n_timepoints, n_cells)
-
+    assert independent_contributions is None or independent_contributions.shape == (
+        n_timepoints,
+        n_cells,
+    )
 
     # (time, out_cell, in_cell1 * in_cell2)
     coordinate_contributions = w_matrix * cell_obs[:, None, :]
@@ -25,10 +29,40 @@ def get_percentage_contributions(
 
     # The value to predict is cell_obs or cell_obs - independent_contributions
     # depending on whetehr the regression has a constant value or not.
-    value_to_predict = cell_obs if independent_contributions is None else cell_obs - independent_contributions
+    value_to_predict = (
+        cell_obs
+        if independent_contributions is None
+        else cell_obs - independent_contributions
+    )
     assert value_to_predict.shape == (n_timepoints, n_cells)
 
     # Get the per coordinate contribution over total value to predict
     percentage_contributions = coordinate_contributions / value_to_predict[:, :, None]
     assert percentage_contributions.shape == (n_timepoints, n_cells, n_cells)
     return percentage_contributions
+
+
+def get_default_parameters(cls: type) -> dict:
+    """
+    Get the default parameters of a class.
+
+    Parameters
+    ----------
+        cls (type): The class to inspect.
+
+    Returns
+    -------
+        default_params: A dictionary with parameter names as
+        keys and their default values as values.
+    """
+    # Get the signature of the class's __init__ method
+    sig = inspect.signature(cls.__init__)
+
+    # Extract parameters with default values
+    default_parameters = {
+        k: v.default
+        for k, v in sig.parameters.items()
+        if v.default is not inspect.Parameter.empty and k != "self"
+    }
+
+    return default_parameters
