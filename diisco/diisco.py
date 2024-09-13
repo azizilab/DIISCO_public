@@ -649,11 +649,10 @@ class DIISCO:
         sampling from the posterior. This function is currently only
         supported while using a MultivariateNormalFactorized guide.
         """
-        if self.guide_name != "MultivariateNormalFactorized":
-            raise ValueError(
-                "The get_means function is only supported when using the "
-                "MultivariateNormalFactorized guide."
-            )
+        supported_guide = ["MultivariateNormalFactorized"]
+        if self.guide_name not in supported_guide:
+            raise ValueError(" Please use a supported guide: {}".format(supported_guide))
+
 
         n_train_timepoints = self.train_timepoints.shape[0]
         n_cell_types = self.n_cell_types

@@ -39,6 +39,7 @@ def generate_data(
     flip_prob_active: float = 0.1,
     flip_prob_inactive: float = 0.1,
     threshold_for_active: float = 0.1,
+    extra_cells = 0
 ) -> SampledData:
     """
     Generates data for DIISCO
@@ -60,7 +61,9 @@ def generate_data(
         The number of dependent variables per block
     n_timepoints : int
         The number of total timepoints
-    noise : float
+    noise_y : float
+        The noise in the data
+    noise_w : float
         The noise in the data
     length_scale : float
         The length scale of the gaussian process
@@ -74,6 +77,9 @@ def generate_data(
     threshold_for_active : float
         How big should the absolute value of the weight be for the edge to be considered active.
 
+    extra_cells: int
+        extra cells that are not varying with time
+
     Returns
     ------------------------
     SampledData :
@@ -83,29 +89,30 @@ def generate_data(
     np.random.seed(seed)
 
     block_size = n_independent_per_block + n_dependent_per_block
-    total_cells = n_blocks * block_size
+    total_cells = n_blocks * block_size + extra_cells
 
     weights = np.zeros((n_timepoints, total_cells, total_cells))
     # m[t, i, j] = 1 if i is computed from j at time t
     observations = np.zeros((n_timepoints, total_cells))
 
-    timepoints = np.linspace(0, 1, n_timepoints)
-
+    timepoints = np.random.uniform(0, 1, n_timepoints)
+    
     # Fill in the weights matrix
-    for i in range(total_cells):
-        for j in range(total_cells):
+    for i in range(total_cells-extra_cells):
+        for j in range(total_cells-extra_cells):
             weights[:, i, j] = _sample_from_gp(
-                timepoints, weights_length_scale, noise
+                timepoints, weights_length_scale, noise#, LOC = 0, _scale = W_SIGMA
             ).flatten()
 
     # Lets pretend that they all independent variables at the start
-    for cell in range(total_cells):
+    for cell in range(total_cells-extra_cells):
         observations[:, cell] = _sample_from_gp(
-            timepoints, length_scale, noise
+            timepoints, length_scale, noise#, LOC = 0, _scale= Y_SIGMA
         ).flatten()
 
     # Now we repace the dependent variables with actual values
     for block in range(n_blocks):
+        
         independent_block = np.arange(
             block * block_size, block * block_size + n_independent_per_block
         )
@@ -114,12 +121,12 @@ def generate_data(
             block * block_size + block_size,
         )
         other_blocks = np.setdiff1d(
-            np.arange(total_cells), np.concatenate([independent_block, dependent_block])
+            np.arange(total_cells-extra_cells), np.concatenate([independent_block, dependent_block])
         )
 
         for cell in independent_block:
             observations[:, cell] = _sample_from_gp(
-                timepoints, length_scale, noise
+                timepoints, length_scale, noise#,  LOC = 0, _scale= Y_SIGMA
             ).flatten()
             weights[:, cell] = 0
             weights[:, cell, cell] = 1
@@ -133,6 +140,12 @@ def generate_data(
                     np.random.randint(0, n_independent_per_block)
                 ] = True
 
+                
+                # observations[:, cell] = _sample_from_gp(
+                # timepoints, length_scale*10, noise
+            # ).flatten()
+            
+            # else:
             for timepoint in range(n_timepoints):
                 weights[timepoint, cell, independent_block] = weights[
                     timepoint, cell, independent_block
@@ -143,19 +156,28 @@ def generate_data(
                     weights[timepoint, cell, independent_block],
                     observations[timepoint, independent_block],
                 )
-                observations[timepoint, cell] = w @ obs + np.random.normal(0, noise)
-
+                observations[timepoint, cell] = w @ obs + np.random.normal(0, noise*10)
+    
     # Standardized observed
     standardized_observations = (observations - np.mean(observations, axis=0)) / np.std(
         observations, axis=0
     )
+
+    for extra_cell in range(total_cells-extra_cells, total_cells):
+        print(extra_cell)
+        # new_scale = 0.00001
+        observations[:, extra_cell] = np.random.normal(scale = 0.01, size=(n_timepoints, 1)).flatten()
+        standardized_observations[:, extra_cell] = observations[:, extra_cell]
+        weights[:, extra_cell] = 0
+        weights[:, extra_cell, extra_cell] = 1
+    
     true_interactions = create_true_interactions_from_dependent_computations(
         weights, threshold_for_active
     )
     model_prior = create_model_prior_from_true_interactions(
         true_interactions, flip_prob_active, flip_prob_inactive
     )
-
+    
     assert weights.shape == (n_timepoints, total_cells, total_cells)
     assert observations.shape == (n_timepoints, total_cells)
     assert timepoints.shape == (n_timepoints,)
@@ -243,19 +265,19 @@ def create_true_interactions_from_dependent_computations(
 
     is_active_matrix = np.abs(weights) > threshold
     # Ensure symmetry
-    adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
+    # adjacency_matrix = np.maximum(is_active_matrix, is_active_matrix.transpose(0, 2, 1))
 
-    for t in range(n_timepoints):
-        # Make sure diagonal is 1 for computation
-        adjacency_matrix[t] = np.maximum(adjacency_matrix[t], np.eye(total_cells))
-        reachability_matrix[t] = compute_reachability_matrix(adjacency_matrix[t])
-        # But also ensure it is 0 for the final result
-        reachability_matrix[t] = np.minimum(
-            reachability_matrix[t], 1 - np.eye(total_cells)
-        )
+    # for t in range(n_timepoints):
+    #     # Make sure diagonal is 1 for computation
+    #     adjacency_matrix[t] = np.maximum(adjacency_matrix[t], np.eye(total_cells))
+    #     reachability_matrix[t] = compute_reachability_matrix(adjacency_matrix[t])
+    #     # But also ensure it is 0 for the final result
+    #     reachability_matrix[t] = np.minimum(
+    #         reachability_matrix[t], 1 - np.eye(total_cells)
+    #     )
 
     # set the diagonal to 0
-    true_interactions = reachability_matrix
+    true_interactions = is_active_matrix # test withotu the symmetry
     original_diagonals = is_active_matrix[
         :, np.arange(total_cells), np.arange(total_cells)
     ].astype(int)
@@ -291,7 +313,9 @@ def compute_reachability_matrix(
 
 
 def _sample_from_gp(
-    x: Float[np.ndarray, "n_examples 1"], lengthscale: float, noise: float
+    x: Float[np.ndarray, "n_examples 1"], lengthscale: float, noise: float,
+    # _scale: float,
+    # LOC: float
 ) -> Float[np.ndarray, "n_examples 1"]:
     """
     Sample from a Gaussian Process with a standard Gaussian (RBF) kernel.
@@ -336,6 +360,9 @@ def _sample_from_gp(
 
     # Sample from the multivariate normal distribution
     L = np.linalg.cholesky(K + 1e-6 * np.eye(n_examples))
-    sample = L @ np.random.normal(size=(n_examples, 1))
+    sample = L @ np.random.normal(
+        # loc = 0,
+        # scale = _scale, 
+                                  size=(n_examples, 1))
 
     return sample

@@ -19,6 +19,8 @@ class RunResults:
     # Metrics pertaining the interactions
     # All the lists have the same length and correspond to using a
     # threshold of that length
+    r2_W: list[float]
+    rmse_W: list[float]
     stds: list[float]
     accuracies: list[float]
     precisions: list[float]
@@ -28,6 +30,12 @@ class RunResults:
     prc_auc: float
     symmetrical_auc: float
     symmetrical_prc_auc: float
+    # holds the predictions of the interactions
+    true_interactions: list[int]
+    transformed_interactions: list[int]
+    symmetrical_transformed_interactions: list[int]
+    predicted_interactions: list[list[list[float]]]  # n_timepoints x n_cells x n_cells
+    predicted_observations: list[list[float]]  # n_timepoints x n_cells
 
     # Metrics pertaining the dataset
     n_cells: int
@@ -40,6 +48,12 @@ class RunResults:
     flip_prob_inactive: float
     threshold_for_active: float
     seed: int
+
+    # Dataset stuff
+    weights: list[list[list[float]]] # n_timepoints x n_cells x n_cells
+    standardized_observations : list[list[float]] # n_timepoints x n_cells
+    observations : list[list[float]] # n_timepoints x n_cells
+    timepoints : list[float] # n_timepoints
 
     # metric pertaining the model itself
     model_name: str
@@ -78,6 +92,10 @@ def print_run_results(run_results: RunResults):
     run_results_str += "Run Results\n"
     run_results_str += bars
     for key, value in run_results.__dict__.items():
+        # if its a list and its too long we don't print it
+        if isinstance(value, list) and len(value) > 15:
+            value = value[:15]
+
         run_results_str += f"{key}: {value}\n"
     run_results_str += bars
     run_results_str += space_between_results

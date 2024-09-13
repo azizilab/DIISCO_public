@@ -65,6 +65,9 @@ class Discretizer(ABC):
         """
         # Just for safety
         transformed_interactions = np.abs(transformed_interactions)
+        # transformed_interactions = np.maximum(
+        #     transformed_interactions, transformed_interactions.transpose(0, 2, 1)
+        # )
         flat_cell_interactions = transformed_interactions.flatten()
         if self.count_zeros:
             cell_std = flat_cell_interactions.std()
@@ -76,7 +79,7 @@ class Discretizer(ABC):
         discretized = (
             transformed_interactions > self.std_deviations * cell_std
         ).astype(int)
-        return np.maximum(discretized, discretized.transpose(0, 2, 1))
+        return discretized
 
     @abstractmethod
     def transform_interactions(

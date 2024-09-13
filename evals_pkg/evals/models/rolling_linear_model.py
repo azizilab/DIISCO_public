@@ -39,6 +39,9 @@ class RollingLinearModel(Model):
         Determines the number of epsilon values to try during the grid search
         for each cell. The search range for epsilon is (0, t_range / 2) where t_range
         is the range of the timepoints provided during the fitting phase.
+    epsilon : float
+        If epsilon is provided then the model will use this value for all cells.
+        And no cross-validation will be performed.
     """
 
     def __init__(
@@ -46,11 +49,15 @@ class RollingLinearModel(Model):
         min_points_per_regression: int = 3,
         num_searches_per_timepoint: int = 10,
         use_bias: bool = False,
+        epsilon: float = None,
+        ignore_is_active: bool = False,
+        ignore_epsilon: bool = False,
     ):
 
         self.min_points_per_regression = min_points_per_regression
         self.num_searches_per_timepoint = num_searches_per_timepoint
         self.use_bias = use_bias
+        self.ignore_is_active = ignore_is_active
 
         self._is_active: Int[ndarray, "n_cells n_cells"] = None
         self._n_cells: int = None
@@ -58,6 +65,9 @@ class RollingLinearModel(Model):
         self._is_fitted: bool = False
 
         self._best_epsilon_per_cell: Float[ndarray, " n_cells"] = None
+        if epsilon is not None and not ignore_epsilon:
+            self._best_epsilon_per_cell = np.ones(self._n_cells) * epsilon
+
 
         self._t_train: Float[ndarray, " n_timepoints"] = None
         self._y_train: Float[ndarray, "n_timepoints n_cells"] = None
@@ -66,7 +76,7 @@ class RollingLinearModel(Model):
         self,
         t: Float[ndarray, " n_timepoints"],
         y: Float[ndarray, "n_timepoints n_cells"],
-        is_active: Int[ndarray, "n_cells n_cells"],
+        is_active: Int[ndarray, "n_cells n_cells"]=None,
     ) -> None:
         """
         Fits the model to the data by saving the observed values of the cells
@@ -82,6 +92,9 @@ class RollingLinearModel(Model):
         is_active:
             A matrix containing 1 if the edge is active, 0 otherwise
         """
+        if self.ignore_is_active:
+            is_active = np.ones((y.shape[1], y.shape[1]))
+
         check_fit_inputs(t, y, is_active)
 
         self._is_active = is_active
@@ -92,21 +105,35 @@ class RollingLinearModel(Model):
         self._n_cells = y.shape[1]
         self._is_fitted = True
 
+        if self._best_epsilon_per_cell is None:
+            self._find_best_epsilon(y, t, is_active)
+        else:
+            self._best_epsilon_per_cell = np.ones(self._n_cells) * self._best_epsilon_per_cell
+
+    def _find_best_epsilon(
+        self,
+        y: Float[ndarray, "n_timepoints n_cells"],
+        t: Float[ndarray, " n_timepoints"],
+        is_active: Int[ndarray, "n_cells n_cells"],
+    ) -> None:
         self._best_epsilon_per_cell = np.zeros(self._n_cells)
 
-        for cell in range(self._n_cells):
-            is_active_cell_idx = [
-                i for i in range(self._n_cells) if is_active[cell, i] == 1
-            ]
-            lm_X = y[:, is_active_cell_idx]
-            lm_y = y[:, cell]
 
+        # We go for a range of possible epsilon and try the model with each
+        # of them. We keep the epsilon that gives the best loss.
+        t_range = np.max(t) - np.min(t)
+        for epsilon in np.linspace(0, t_range / 2, self.num_searches_per_timepoint):
             best_loss = np.inf
-            t_range = np.max(t) - np.min(t)
+            loss = 0
+            for cell in range(self._n_cells):
+                is_active_cell_idx = [
+                    i for i in range(self._n_cells) if is_active[cell, i] == 1
+                ]
+                lm_X = y[:, is_active_cell_idx]
+                lm_y = y[:, cell]
 
-            # We go for a range of possible epsilon and try the model with each
-            # of them. We keep the epsilon that gives the best loss.
-            for epsilon in np.linspace(0, t_range / 2, self.num_searches_per_timepoint):
+                best_loss = np.inf
+
                 y_pred = _looc_preds_for_rolling_linear_model(
                     X=lm_X,
                     y=lm_y,
@@ -115,10 +142,12 @@ class RollingLinearModel(Model):
                     min_points_per_regression=self.min_points_per_regression,
                     use_bias=self.use_bias,
                 )
-                loss = np.mean((y_pred - lm_y) ** 2)
-                if loss < best_loss:
-                    best_loss = loss
-                    self._best_epsilon_per_cell[cell] = epsilon
+                loss += np.mean((y_pred - lm_y) ** 2)
+            if loss < best_loss:
+                best_loss = loss
+                self._best_epsilon_per_cell = np.ones(self._n_cells) * epsilon
+
+
 
     def predict_y_train(
         self,
