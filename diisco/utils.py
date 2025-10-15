@@ -1,5 +1,4 @@
 import torch
-from scipy.stats import norm
 
 
 def flat_vect_to_lower_triangular_matrix(vect, n, batch_size):
@@ -28,13 +27,14 @@ def make_psd(mat):
     """
 
     # Add a small constant to the diagonal to make sure the matrix is positive definite
-    small_constant = 0.00001
+    small_constant = 0.000000001
 
     if mat.shape[0] == mat.shape[1]:
         if len(mat.shape) == 3:
             mat = (
                 mat
-                + torch.eye(mat.shape[-1]).repeat(mat.shape[0], 1, 1) * small_constant
+                + torch.eye(mat.shape[-1]).repeat(mat.shape[0], 1, 1)
+                * small_constant
             )
         else:
             mat = mat + torch.eye(mat.shape[-1]) * small_constant
@@ -57,26 +57,3 @@ def make_symmetric(mat):
         block = (block + block.transpose(-1, -2)) / 2
         mat[..., :min_dim, :min_dim] = block
         return mat
-
-
-def shape_and_rate_from_range(
-    lower_bound: float, upper_bound: float, confidence_interval: float
-) -> (float, float):
-    """
-    Computes the shape and rate parameters of a Gamma distribution so
-    that approximately the given confidence interval is covered with
-    the coverage specified by the "confidence_interval" parameter.
-
-    The function approximates a gamma with a normal distribution
-    with the same mean and variance and then computes the shape and
-    rate parameters of the gamma distribution that cover the same
-    confidence interval as the normal distribution.
-    """
-    tail = (1 - confidence_interval) / 2
-    c = norm.ppf(1 - tail)
-
-    range = upper_bound - lower_bound
-    mean = (upper_bound + lower_bound) / 2
-    beta = 2 * c**2 * (2 * mean) / range**2
-    alpha = c**2 * (2 * mean) ** 2 / range**2
-    return alpha, beta

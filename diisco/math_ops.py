@@ -5,10 +5,7 @@ import diisco.utils as utils
 
 def is_psd(mat):
     is_symmetric = bool((mat == mat.T).all())
-
-    eigenvalues = torch.linalg.eigvalsh(mat)
-    is_positive_definite = bool((eigenvalues > 0).all())
-
+    is_positive_definite = bool(torch.all(torch.symeig(mat)[0] > 0))
     return is_symmetric and is_positive_definite
 
 
@@ -31,6 +28,4 @@ def rbf_kernel(
     dists = torch.cdist(x1_scaled, x2_scaled, p=2)
     covariance = variance * torch.exp(-0.5 * dists**2)
     covariance = utils.make_psd(covariance)
-    if x1.shape[0] == x2.shape[0]:
-        covariance = utils.make_symmetric(covariance)
     return covariance
